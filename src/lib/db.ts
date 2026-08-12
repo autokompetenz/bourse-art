@@ -1,5 +1,5 @@
 import { supabase, supabaseConfig } from "./supabase";
-import { demoActivateArtist, demoCreateArtist, demoDeleteArtist, getDemoArtists, getDemoUsers } from "./auth";
+import { demoActivateArtist, demoCreateArtist, demoDeleteArtist, getDemoArtists, getDemoUsers, sendActivationLink } from "./auth";
 import { dataUrlToBlob } from "@/utils/image";
 import { notifyArtistOfSale } from "./email";
 
@@ -742,7 +742,14 @@ export async function createArtistAccount(
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string };
   if (!result.ok) return { ok: false, error: result.error ?? "Création impossible." };
-  return { ok: true };
+  const link = await sendActivationLink(email.trim());
+  return {
+    ok: true,
+    data: {
+      emailStatus: link.ok ? ("sent" as const) : ("error" as const),
+      emailDetail: link.ok ? undefined : link.error,
+    },
+  };
 }
 
 /** Mode démo uniquement : le client choisit directement son mot de passe. */

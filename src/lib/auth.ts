@@ -194,7 +194,8 @@ export async function sendActivationLink(
     return {
       ok: false,
       error:
-        "Aucun compte en attente pour cet email, ou lien impossible à envoyer. Vérifiez que l'administrateur a bien créé votre compte.",
+        "Le lien d'activation n'a pas pu être envoyé. Vérifiez que l'administrateur a bien créé le compte et que le SMTP est configuré. " +
+        (error.message || ""),
     };
   }
   return { ok: true };

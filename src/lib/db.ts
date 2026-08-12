@@ -1,5 +1,5 @@
 import { supabase, supabaseConfig } from "./supabase";
-import { demoCreateArtist, getDemoUsers } from "./auth";
+import { demoActivateArtist, demoCreateArtist, getDemoArtists, getDemoUsers } from "./auth";
 import { dataUrlToBlob } from "@/utils/image";
 import { notifyArtistOfSale } from "./email";
 
@@ -676,38 +676,57 @@ export type ArtistRecord = {
   role: string;
   created_at: string;
   artworks_count: number;
+  pending?: boolean;
 };
 
 export async function listArtists(): Promise<ArtistRecord[]> {
   if (!supabaseConfig.configured) {
-    return getDemoUsers()
-      .filter((u) => u.role === "artist")
-      .map((u, i) => ({ ...u, created_at: "", artworks_count: 0 }));
+    return getDemoArtists();
   }
-  const { data, error } = await supabase
-    .from("users")
-    .select(
-      "id, name, email, role, created_at, artworks_count:artworks(count)"
-    )
-    .eq("role", "artist")
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return normalize<ArtistRecord>(data).map((a) => ({
+  const [activeResult, pendingResult] = await Promise.all([
+    supabase
+      .from("users")
+      .select(
+        "id, name, email, role, created_at, artworks_count:artworks(count)"
+      )
+      .eq("role", "artist"),
+    supabase.from("pending_users").select("id, name, email, created_at"),
+  ]);
+  if (activeResult.error) throw new Error(activeResult.error.message);
+  const active = normalize<ArtistRecord>(activeResult.data).map((a) => ({
     ...a,
+    pending: false,
     artworks_count:
       typeof a.artworks_count === "number"
         ? a.artworks_count
         : (a.artworks_count as unknown as { count: number }[] | undefined)?.[0]?.count ?? 0,
   }));
+  const pending = (
+    (pendingResult.data as
+      | { id: string; name: string; email: string; created_at: string }[]
+      | null
+      | undefined) ?? []
+  ).map((p) => ({
+      id: p.id,
+      name: p.name,
+      email: p.email,
+      role: "artist",
+      created_at: p.created_at,
+      artworks_count: 0,
+      pending: true,
+    }))
+    .filter(Boolean);
+  return [...active, ...pending].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at)
+  );
 }
 
 export async function createArtistAccount(
   name: string,
-  email: string,
-  password: string
+  email: string
 ): Promise<OpResult> {
   if (!supabaseConfig.configured) {
-    const created = demoCreateArtist(name, email, password);
+    const created = demoCreateArtist(name, email);
     return created
       ? { ok: true }
       : { ok: false, error: "Cet email est déjà utilisé." };
@@ -715,10 +734,29 @@ export async function createArtistAccount(
   const { data, error } = await supabase.rpc("admin_create_artist", {
     p_name: name.trim(),
     p_email: email.trim().toLowerCase(),
-    p_password: password,
   });
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string };
   if (!result.ok) return { ok: false, error: result.error ?? "Création impossible." };
+  return { ok: true };
+}
+
+export async function activateArtist(
+  email: string,
+  password: string
+): Promise<OpResult> {
+  if (!supabaseConfig.configured) {
+    const activated = demoActivateArtist(email, password);
+    return activated
+      ? { ok: true }
+      : { ok: false, error: "Aucun compte en attente pour cet email." };
+  }
+  const { data, error } = await supabase.rpc("activate_artist", {
+    p_email: email.trim().toLowerCase(),
+    p_password: password,
+  });
+  if (error) return { ok: false, error: error.message };
+  const result = data as { ok: boolean; error?: string };
+  if (!result.ok) return { ok: false, error: result.error ?? "Activation impossible." };
   return { ok: true };
 }

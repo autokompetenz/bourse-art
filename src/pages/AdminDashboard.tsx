@@ -91,7 +91,7 @@ export default function AdminDashboard() {
   const [iban, setIban] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
+  const [newUser, setNewUser] = useState({ name: "", email: "" });
   const [creatingUser, setCreatingUser] = useState(false);
 
   const [saleForm, setSaleForm] = useState<{
@@ -195,19 +195,19 @@ export default function AdminDashboard() {
 
   const handleCreateUser = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newUser.name.trim() || !newUser.email.trim() || !newUser.password.trim()) {
-      toast.error("Tous les champs sont obligatoires.");
+    if (!newUser.name.trim() || !newUser.email.trim()) {
+      toast.error("Le nom et l'email sont obligatoires.");
       return;
     }
     setCreatingUser(true);
-    const result = await createArtistAccount(newUser.name, newUser.email, newUser.password);
+    const result = await createArtistAccount(newUser.name, newUser.email);
     setCreatingUser(false);
     if (!result.ok) {
       toast.error(result.error);
       return;
     }
-    toast.success("Compte artiste créé.");
-    setNewUser({ name: "", email: "", password: "" });
+    toast.success("Compte créé. Le client définira son mot de passe à l'inscription.");
+    setNewUser({ name: "", email: "" });
   };
 
   const handleSaveSale = async (e: FormEvent) => {
@@ -484,7 +484,11 @@ export default function AdminDashboard() {
         {tab === "comptes" && (
           <section className="border border-dark_border/25 rounded-xl p-6 bg-white">
             <h2 className="text-ink text-24 font-medium mb-6">Créer un compte artiste</h2>
-            <form onSubmit={handleCreateUser} className="grid md:grid-cols-3 gap-6">
+            <p className="text-muted text-17 mb-6">
+              Le client définira son mot de passe lors de son inscription. Vous ne fournissez
+              que le nom et l'email.
+            </p>
+            <form onSubmit={handleCreateUser} className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-muted text-17 mb-2">Nom</label>
                 <input
@@ -507,20 +511,7 @@ export default function AdminDashboard() {
                   placeholder="artiste@exemple.com"
                 />
               </div>
-              <div>
-                <label className="block text-muted text-17 mb-2">Mot de passe</label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  className={inputClass}
-                  placeholder="6 caractères minimum"
-                />
-              </div>
-              <div className="md:col-span-3">
+              <div className="md:col-span-2">
                 <button
                   type="submit"
                   disabled={creatingUser}
@@ -551,7 +542,13 @@ export default function AdminDashboard() {
                           {a.created_at ? ` · inscrit le ${formatDate(a.created_at)}` : ""}
                         </p>
                       </div>
-                      <span className="chip !text-primary !border-primary/40">Artiste</span>
+                      {a.pending ? (
+                        <span className="chip !text-warning !border-warning/40">
+                          En attente d'inscription
+                        </span>
+                      ) : (
+                        <span className="chip !text-primary !border-primary/40">Artiste</span>
+                      )}
                     </li>
                   ))}
                 </ul>

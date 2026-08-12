@@ -17,7 +17,7 @@ export type AuthResult =
 const DEMO_SESSION_KEY = "bourse_demo_session";
 const DEMO_USERS_KEY = "bourse_demo_users";
 
-type DemoUser = Profile & { password: string };
+type DemoUser = Profile & { password: string | null };
 
 const SEED_DEMO_USERS: DemoUser[] = [
   { id: "demo-admin", name: "Admin", email: "admin@bourse.com", password: "admin123", role: "admin" },
@@ -60,13 +60,25 @@ function profileFromAuthUser(authUser: AuthUser): Profile {
 
 export async function signIn(email: string, password: string): Promise<AuthResult> {
   if (!isConfigured()) {
+    const normalized = email.trim().toLowerCase();
     const demo = readDemoUsers().find(
-      (u) => u.email === email.trim().toLowerCase() && u.password === password
+      (u) => u.email === normalized && u.password === password
     );
-    if (!demo) return { ok: false, error: "Email ou mot de passe incorrect." };
-    const { password: _ignored, ...user } = demo;
-    localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(user));
-    return { ok: true, user };
+    if (demo) {
+      const { password: _ignored, ...user } = demo;
+      localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(user));
+      return { ok: true, user };
+    }
+    const pending = readDemoUsers().find(
+      (u) => u.email === normalized && u.password === null
+    );
+    if (pending) {
+      return {
+        ok: false,
+        error: "Votre compte est en attente : définissez votre mot de passe à l'inscription.",
+      };
+    }
+    return { ok: false, error: "Email ou mot de passe incorrect." };
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -115,10 +127,12 @@ export function onAuthStateChange(cb: (user: Profile | null) => void): () => voi
 }
 
 export function getDemoUsers(): Profile[] {
-  return readDemoUsers().map(({ password: _ignored, ...user }) => user);
+  return readDemoUsers()
+    .filter((u) => u.password)
+    .map(({ password: _ignored, ...user }) => user);
 }
 
-export function demoCreateArtist(name: string, email: string, password: string): boolean {
+export function demoCreateArtist(name: string, email: string): boolean {
   if (isConfigured()) return false;
   const users = readDemoUsers();
   const emailNormalized = email.trim().toLowerCase();
@@ -127,9 +141,45 @@ export function demoCreateArtist(name: string, email: string, password: string):
     id: `demo-${Date.now()}`,
     name: name.trim(),
     email: emailNormalized,
-    password,
+    password: null,
     role: "artist",
   };
   localStorage.setItem(DEMO_USERS_KEY, JSON.stringify([...users, newUser]));
   return true;
+}
+
+export function demoActivateArtist(email: string, password: string): boolean {
+  if (isConfigured()) return false;
+  const users = readDemoUsers();
+  const user = users.find(
+    (u) => u.email === email.trim().toLowerCase() && u.password === null
+  );
+  if (!user) return false;
+  const next = users.map((u) => (u.id === user.id ? { ...u, password } : u));
+  localStorage.setItem(DEMO_USERS_KEY, JSON.stringify(next));
+  return true;
+}
+
+export type DemoArtistAccount = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  pending: boolean;
+  created_at: string;
+  artworks_count: number;
+};
+
+export function getDemoArtists(): DemoArtistAccount[] {
+  return readDemoUsers()
+    .filter((u) => u.role === "artist")
+    .map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      pending: !u.password,
+      created_at: "",
+      artworks_count: 0,
+    }));
 }

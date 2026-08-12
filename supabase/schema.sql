@@ -26,6 +26,7 @@ create table if not exists public.artworks (
 );
 
 alter table public.artworks add column if not exists gradient text;
+alter table public.artworks add column if not exists image_url text;
 
 -- Commandes de tableaux passées par les clients
 create table if not exists public.orders (

@@ -692,7 +692,13 @@ export async function listArtists(): Promise<ArtistRecord[]> {
     .eq("role", "artist")
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
-  return normalize<ArtistRecord>(data);
+  return normalize<ArtistRecord>(data).map((a) => ({
+    ...a,
+    artworks_count:
+      typeof a.artworks_count === "number"
+        ? a.artworks_count
+        : (a.artworks_count as unknown as { count: number }[] | undefined)?.[0]?.count ?? 0,
+  }));
 }
 
 export async function createArtistAccount(

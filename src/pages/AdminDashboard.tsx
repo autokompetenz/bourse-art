@@ -206,7 +206,18 @@ export default function AdminDashboard() {
       toast.error(result.error);
       return;
     }
-    toast.success("Compte créé. Le client définira son mot de passe à l'inscription.");
+    const notification = (result.data as { notification?: EmailResult } | undefined)
+      ?.notification;
+    if (notification?.status === "sent") {
+      toast.success("Compte créé. Un email d'invitation a été envoyé au client.");
+    } else {
+      toast.success("Compte créé. Le client définira son mot de passe à l'inscription.");
+      if (notification?.status === "error") {
+        toast.error(
+          `L'email d'invitation n'a pas pu être envoyé : ${notification.detail ?? "erreur inconnue"}`
+        );
+      }
+    }
     setNewUser({ name: "", email: "" });
   };
 

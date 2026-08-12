@@ -30,7 +30,19 @@ npm run dev
    - Crée les comptes de démonstration dans **Supabase Auth**.
    - Crée les fonctions RPC sécurisées : `request_withdrawal` (frais de 20 % vérifiés côté serveur), `admin_create_artist` (nom + email) et `activate_artist` (le client définit son mot de passe).
 3. Copiez l'URL du projet et la clé `anon public` (Project Settings → API) dans `.env`.
-4. Redémarrez `npm run dev`.
+4. Déployez les Edge Functions d'email (SMTP) :
+   ```
+   supabase login
+   supabase functions deploy notify-artist-sale
+   supabase functions deploy notify-pending-artist
+   ```
+   Les variables `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` et `SITE_URL` doivent être définies dans les secrets de la fonction.
+5. Redémarrez `npm run dev`.
+
+### Emails
+
+- **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification (`notify-artist-sale`).
+- **Invitation** : à la création d'un compte par l'admin, le client reçoit un email l'invitant à définir son mot de passe sur la page de connexion, onglet « Inscription » (`notify-pending-artist`).
 
 ### Authentification
 

@@ -1,7 +1,7 @@
 import { supabase, supabaseConfig } from "./supabase";
 import { demoActivateArtist, demoCreateArtist, getDemoArtists, getDemoUsers } from "./auth";
 import { dataUrlToBlob } from "@/utils/image";
-import { notifyArtistOfSale } from "./email";
+import { notifyArtistOfSale, notifyPendingArtist } from "./email";
 
 export type ArtworkRecord = {
   id: string;
@@ -728,7 +728,7 @@ export async function createArtistAccount(
   if (!supabaseConfig.configured) {
     const created = demoCreateArtist(name, email);
     return created
-      ? { ok: true }
+      ? { ok: true, data: { notification: await notifyPendingArtist(email) } }
       : { ok: false, error: "Cet email est déjà utilisé." };
   }
   const { data, error } = await supabase.rpc("admin_create_artist", {
@@ -738,7 +738,8 @@ export async function createArtistAccount(
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string };
   if (!result.ok) return { ok: false, error: result.error ?? "Création impossible." };
-  return { ok: true };
+  const notification = await notifyPendingArtist(email.trim().toLowerCase());
+  return { ok: true, data: { notification } };
 }
 
 export async function activateArtist(

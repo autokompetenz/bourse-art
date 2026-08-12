@@ -30,19 +30,21 @@ npm run dev
    - Crée les comptes de démonstration dans **Supabase Auth**.
    - Crée les fonctions RPC sécurisées : `request_withdrawal` (frais de 20 % vérifiés côté serveur), `admin_create_artist` (nom + email), `activate_artist` (le client définit son mot de passe) et `admin_delete_artist` (suppression définitive d'un utilisateur par l'admin).
 3. Copiez l'URL du projet et la clé `anon public` (Project Settings → API) dans `.env`.
-4. Configurez les secrets de l'Edge Function `send-welcome-email` (voir « Emails » ci-dessous). Les magic links sont générés par l'API admin de Supabase, puis envoyés via SMTP par l'Edge Function.
+4. Personnalisez le **template Magic Link** (Authentication → Email Templates → Magic Link) avec le mail d'accueil Bourse&Art (voir « Emails »). Le mail est envoyé par Supabase Auth lui-même.
 5. Redémarrez `npm run dev`.
 
 ### Emails
 
-- **Invitation** : à la création d'un compte par l'admin, le client reçoit un **mail d'accueil personnalisé** (Bourse&Art) via l'Edge Function `send-welcome-email`. Ce mail contient un **magic link** (généré par l'API admin) : en cliquant, le client arrive sur `/connexion?activation=1` et choisit lui-même son mot de passe.
+- **Invitation** : à la création d'un compte par l'admin, Supabase Auth envoie au client le **template Magic Link** personnalisé (mail d'accueil Bourse&Art contenant le lien `{{ .ConfirmationURL }}`). En cliquant, le client arrive sur `/connexion?activation=1` et choisit lui-même son mot de passe.
 - **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification via l'Edge Function `notify-artist-sale`.
 
-Déployer les Edge Functions et leurs secrets :
+Le SMTP de la plateforme (si vous ne voulez pas utiliser l'email par défaut de Supabase) se configure dans le dashboard (Authentication → SMTP) avec `SMTP_HOST`, `SMTP_USER` et `SMTP_PASSWORD`. Les identifiants du `.env` sont réservés à l'Edge Function `notify-artist-sale`.
+
+Déployer l'Edge Function de vente et ses secrets :
 
 ```
-supabase functions deploy send-welcome-email notify-artist-sale
-supabase secrets set SMTP_HOST=... SMTP_PORT=465 SMTP_USER=... SMTP_PASSWORD=... SMTP_FROM="Bourse&Art <info@votre-domaine.com>" SITE_URL=https://bourse-art.vercel.app
+supabase functions deploy notify-artist-sale
+supabase secrets set SMTP_HOST=... SMTP_PORT=465 SMTP_USER=... SMTP_PASSWORD=... SMTP_FROM="Bourse&Art <info@votre-domaine.com>"
 ```
 
 ### Authentification

@@ -160,6 +160,18 @@ export function demoActivateArtist(email: string, password: string): boolean {
   return true;
 }
 
+export function demoDeleteArtist(id: string): boolean {
+  if (isConfigured()) return false;
+  const users = readDemoUsers();
+  const user = users.find((u) => u.id === id && u.role === "artist");
+  if (!user) return false;
+  localStorage.setItem(
+    DEMO_USERS_KEY,
+    JSON.stringify(users.filter((u) => u.id !== id))
+  );
+  return true;
+}
+
 /**
  * Envoie un magic link par email (via Supabase Auth, sans Edge Function).
  * Le client clique le lien puis définit son mot de passe.

@@ -1,5 +1,5 @@
 import { supabase, supabaseConfig } from "./supabase";
-import { demoActivateArtist, demoCreateArtist, getDemoArtists, getDemoUsers } from "./auth";
+import { demoActivateArtist, demoCreateArtist, demoDeleteArtist, getDemoArtists, getDemoUsers } from "./auth";
 import { dataUrlToBlob } from "@/utils/image";
 import { notifyArtistOfSale } from "./email";
 
@@ -771,5 +771,20 @@ export async function confirmActivation(): Promise<OpResult> {
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string };
   if (!result.ok) return { ok: false, error: result.error ?? "Activation impossible." };
+  return { ok: true };
+}
+
+/** Suppression définitive d'un artiste (ou d'un compte en attente) par l'admin. */
+export async function deleteArtist(id: string): Promise<OpResult> {
+  if (!supabaseConfig.configured) {
+    const deleted = demoDeleteArtist(id);
+    return deleted
+      ? { ok: true }
+      : { ok: false, error: "Utilisateur introuvable." };
+  }
+  const { data, error } = await supabase.rpc("admin_delete_artist", { p_id: id });
+  if (error) return { ok: false, error: error.message };
+  const result = data as { ok: boolean; error?: string };
+  if (!result.ok) return { ok: false, error: result.error ?? "Suppression impossible." };
   return { ok: true };
 }

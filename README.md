@@ -28,7 +28,7 @@ npm run dev
    - Crée les tables `users`, `artworks`, `orders`, `withdrawals`, `settings`, `pending_users`.
    - Active la **Row Level Security** sur toutes les tables.
    - Crée les comptes de démonstration dans **Supabase Auth**.
-   - Crée les fonctions RPC sécurisées : `request_withdrawal` (frais de 20 % vérifiés côté serveur), `admin_create_artist` (nom + email) et `activate_artist` (le client définit son mot de passe).
+   - Crée les fonctions RPC sécurisées : `request_withdrawal` (frais de 20 % vérifiés côté serveur), `admin_create_artist` (nom + email), `activate_artist` (le client définit son mot de passe) et `admin_delete_artist` (suppression définitive d'un utilisateur par l'admin).
 3. Copiez l'URL du projet et la clé `anon public` (Project Settings → API) dans `.env`.
 4. Configurez le SMTP dans le dashboard Supabase (Authentication → SMTP) avec de vraies identifiants. Le magic link est envoyé par Supabase Auth lui-même, **aucune Edge Function n'est requise**.
 5. Personnalisez le template du magic link (Authentication → Email Templates → Magic Link) avec le lien `{{ .RedirectTo }}`.

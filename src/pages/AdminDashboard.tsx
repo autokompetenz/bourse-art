@@ -10,6 +10,7 @@ import {
   WithdrawalRecord,
   createArtistAccount,
   deleteArtwork,
+  deleteArtist,
   getSettings,
   listArtists,
   listArtworks,
@@ -110,6 +111,7 @@ export default function AdminDashboard() {
   const [wdPage, setWdPage] = useState(1);
   const [wdStatusBusy, setWdStatusBusy] = useState<string | null>(null);
   const [deletingArtworkId, setDeletingArtworkId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   const [cardSearch, setCardSearch] = useState("");
   const [cardPage, setCardPage] = useState(1);
@@ -264,6 +266,22 @@ export default function AdminDashboard() {
       return;
     }
     toast.success("Tableau supprimé.");
+    loadAll();
+  };
+
+  const handleDeleteArtist = async (a: ArtistRecord) => {
+    const label = a.pending
+      ? `Supprimer définitivement le compte en attente de « ${a.name} » ?`
+      : `Supprimer définitivement l'artiste « ${a.name} » ? Cette action supprime ses œuvres, ses ventes et son compte.`;
+    if (!window.confirm(label)) return;
+    setDeletingUserId(a.id);
+    const result = await deleteArtist(a.id);
+    setDeletingUserId(null);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Utilisateur supprimé définitivement.");
     loadAll();
   };
 
@@ -542,13 +560,22 @@ export default function AdminDashboard() {
                           {a.created_at ? ` · inscrit le ${formatDate(a.created_at)}` : ""}
                         </p>
                       </div>
-                      {a.pending ? (
-                        <span className="chip !text-warning !border-warning/40">
-                          En attente d'inscription
-                        </span>
-                      ) : (
-                        <span className="chip !text-primary !border-primary/40">Artiste</span>
-                      )}
+                      <div className="flex items-center gap-4 shrink-0">
+                        {a.pending ? (
+                          <span className="chip !text-warning !border-warning/40">
+                            En attente d'inscription
+                          </span>
+                        ) : (
+                          <span className="chip !text-primary !border-primary/40">Artiste</span>
+                        )}
+                        <button
+                          onClick={() => handleDeleteArtist(a)}
+                          disabled={deletingUserId === a.id}
+                          className="text-error text-17 hover:underline disabled:opacity-50"
+                        >
+                          {deletingUserId === a.id ? "Suppression..." : "Supprimer"}
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>

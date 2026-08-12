@@ -1,0 +1,233 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: "Outfit", sans-serif;
+  @apply bg-darkmode text-ink antialiased;
+}
+
+::selection {
+  @apply bg-primary/15 text-primary-dark;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-primary/25 rounded-full;
+}
+
+/* ============================================================
+   Keyframes
+   ============================================================ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50%      { transform: translateY(-24px) translateX(12px); }
+}
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%      { opacity: 0.7; transform: scale(1.18); }
+}
+
+@keyframes gradShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes flashUp {
+  0%   { color: #3cd278; }
+  100% { color: inherit; }
+}
+
+@keyframes flashDown {
+  0%   { color: #CF3127; }
+  100% { color: inherit; }
+}
+
+/* ============================================================
+   Reveal au scroll (IntersectionObserver)
+   ============================================================ */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ============================================================
+   Composants réutilisables
+   ============================================================ */
+@layer components {
+  .container-lg {
+    @apply container mx-auto lg:max-w-screen-xl px-4;
+  }
+
+  .btn-grad {
+    @apply relative inline-flex items-center justify-center gap-2 rounded-lg font-semibold text-white transition-all duration-300 overflow-hidden;
+    background: linear-gradient(135deg, #132853, #0e1e3d);
+    box-shadow: 0 4px 20px rgba(19, 40, 83, 0.2);
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 16px 40px;
+  }
+  .btn-grad:hover {
+    background: linear-gradient(135deg, #1e3a6e, #132853);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 32px rgba(19, 40, 83, 0.35);
+  }
+  .btn-grad:active {
+    transform: translateY(0);
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-300;
+    background: transparent;
+    color: #111113;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 15px 40px;
+  }
+  .btn-ghost:hover {
+    border-color: #132853;
+    color: #132853;
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost-light {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-300;
+    background: transparent;
+    color: #111113;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 15px 40px;
+  }
+  .btn-ghost-light:hover {
+    border-color: #132853;
+    color: #132853;
+    transform: translateY(-1px);
+  }
+
+  .card {
+    @apply relative rounded-xl border border-dark_border/25 bg-white transition-all duration-300;
+  }
+  .card:hover {
+    @apply border-primary/40 -translate-y-1;
+    box-shadow: 0 22px 50px -24px rgba(19, 40, 83, 0.25);
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(120deg, #c9a84c, #ffd24d, #c9a84c);
+    background-size: 200% auto;
+    animation: gradShift 6s linear infinite;
+  }
+
+  .glass {
+    @apply backdrop-blur-xl bg-white/85;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-dark_border/40 px-4 py-1.5 text-14 text-muted;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(19, 40, 83, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(19, 40, 83, 0.06) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  .orb {
+    @apply absolute rounded-full blur-[120px] pointer-events-none;
+  }
+
+  .section-eyebrow {
+    @apply inline-flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.4em] text-primary;
+  }
+  .section-eyebrow::before {
+    content: '';
+    width: 32px;
+    height: 1px;
+    background: #132853;
+  }
+  .section-eyebrow-center {
+    @apply inline-flex items-center justify-center gap-3 text-[10px] font-bold uppercase tracking-[0.4em] text-primary;
+  }
+  .section-eyebrow-center::before,
+  .section-eyebrow-center::after {
+    content: '';
+    width: 32px;
+    height: 1px;
+    background: #132853;
+  }
+}
+
+/* ============================================================
+   Utilitaire ticker
+   ============================================================ */
+.animate-ticker {
+  animation: ticker 40s linear infinite;
+}
+.ticker-track:hover .animate-ticker {
+  animation-play-state: paused;
+}
+
+.flash-up { animation: flashUp 1.6s ease-out; }
+.flash-down { animation: flashDown 1.6s ease-out; }
+
+.animate-float { animation: float 7s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulseGlow 6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

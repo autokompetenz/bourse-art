@@ -8,6 +8,7 @@ import {
   OrderRecord,
   WithdrawalRecord,
   createArtistAccount,
+  deleteArtwork,
   getSettings,
   listArtworks,
   listCards,
@@ -104,6 +105,7 @@ export default function AdminDashboard() {
   const [wdSearch, setWdSearch] = useState("");
   const [wdPage, setWdPage] = useState(1);
   const [wdStatusBusy, setWdStatusBusy] = useState<string | null>(null);
+  const [deletingArtworkId, setDeletingArtworkId] = useState<string | null>(null);
 
   const [cardSearch, setCardSearch] = useState("");
   const [cardPage, setCardPage] = useState(1);
@@ -232,6 +234,19 @@ export default function AdminDashboard() {
       return;
     }
     toast.success("Tableau repassé en négociation.");
+    loadAll();
+  };
+
+  const handleDeleteArtwork = async (id: string, title: string) => {
+    if (!window.confirm(`Supprimer le tableau « ${title} » ?`)) return;
+    setDeletingArtworkId(id);
+    const result = await deleteArtwork(id);
+    setDeletingArtworkId(null);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Tableau supprimé.");
     loadAll();
   };
 
@@ -419,14 +434,23 @@ export default function AdminDashboard() {
                           )}
                         </p>
                       </div>
-                      {art.status === "sold" && (
+                      <div className="flex items-center gap-4 shrink-0">
+                        {art.status === "sold" && (
+                          <button
+                            onClick={() => handleRevert(art.id)}
+                            className="text-warning text-17 hover:underline"
+                          >
+                            Repasser en négociation
+                          </button>
+                        )}
                         <button
-                          onClick={() => handleRevert(art.id)}
-                          className="text-warning text-17 hover:underline"
+                          onClick={() => handleDeleteArtwork(art.id, art.title)}
+                          disabled={deletingArtworkId === art.id}
+                          className="text-error text-17 hover:underline disabled:opacity-50"
                         >
-                          Repasser en négociation
+                          {deletingArtworkId === art.id ? "Suppression..." : "Supprimer"}
                         </button>
-                      )}
+                      </div>
                     </li>
                   ))}
                 </ul>

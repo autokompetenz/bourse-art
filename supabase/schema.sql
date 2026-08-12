@@ -1,21 +1,4 @@
--- ============================================================
--- Schéma de la base Supabase pour le site BOURSE & Tableaux
--- À exécuter dans le SQL Editor de Supabase.
---
--- Authentification : Supabase Auth (JWT), PAS de hash côté client.
--- Sécurité : Row Level Security (RLS) activée sur toutes les tables,
---            retraits et création de comptes via des fonctions RPC.
---
--- Comptes de démonstration (créés ci-dessous) :
---   admin     : admin@bourse.com / admin123
---   artiste   : artiste@demo.com / artist123
--- ============================================================
-
--- ------------------------------------------------------------
--- Tables
--- ------------------------------------------------------------
-
--- Profils liés à auth.users (l'utilisateur est créé via Supabase Auth)
+create extension if not exists pgcrypto with schema extensions;
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
@@ -246,24 +229,27 @@ create or replace function public.create_auth_user(
   p_role text
 )
 returns uuid
-language plpgsql security definer set search_path = public
+language plpgsql security definer set search_path = public, extensions
 as $$
 declare
   v_uid uuid := gen_random_uuid();
-  v_instance uuid;
+  v_instance uuid := '00000000-0000-0000-0000-000000000000';
   v_exists uuid;
 begin
   select id into v_exists from auth.users where lower(email) = lower(p_email) limit 1;
   if v_exists is not null then
     return v_exists;
   end if;
-  select instance_id into v_instance from auth.instance limit 1;
   insert into auth.users (
     instance_id, id, aud, role, email, encrypted_password,
-    email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+    email_confirmed_at, confirmation_token, recovery_token,
+    email_change, email_change_token_new, email_change_token_current,
+    phone_change, phone_change_token, reauthentication_token,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at
   ) values (
     v_instance, v_uid, 'authenticated', 'authenticated', lower(p_email),
     crypt(p_password, gen_salt('bf')), now(),
+    '', '', '', '', '', '', '', '',
     jsonb_build_object('provider', 'email', 'providers', array['email'], 'role', p_role),
     jsonb_build_object('name', p_name),
     now(), now()

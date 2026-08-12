@@ -350,8 +350,9 @@ grant execute on function public.request_withdrawal(numeric, text) to authentica
 -- Vue publique de la galerie (sans exposer les emails des artistes)
 -- Sécurité invoker désactivée : exécutée avec les droits du propriétaire,
 -- mais elle ne renvoie que les champs destinés à l'affichage public.
--- ------------------------------------------------------------
-create or replace view public.gallery_artworks as
+-- Le DROP évite l'erreur "cannot change name of view column" lors de la migration.
+drop view if exists public.gallery_artworks;
+create view public.gallery_artworks as
 select
   a.id,
   a.title,

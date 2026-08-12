@@ -314,6 +314,9 @@ create policy pending_users_delete_admin on public.pending_users
 -- (jamais communiqué) ; le client reçoit un magic link pour définir
 -- lui-même son mot de passe.
 -- ------------------------------------------------------------
+-- Supprime l'ancienne signature (nom, email, mot de passe) utilisée avant
+-- le passage au magic link : seule la version (nom, email) est conservée.
+drop function if exists public.admin_create_artist(text, text, text);
 create or replace function public.admin_create_artist(p_name text, p_email text)
 returns json
 language plpgsql security definer set search_path = public, extensions

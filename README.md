@@ -24,7 +24,7 @@ npm run dev
 ## Configuration Supabase
 
 1. Créez un projet sur [supabase.com](https://supabase.com).
-2. Dans le SQL Editor, exécutez le contenu de `supabase/schema.sql`.
+2. Dans le SQL Editor, exécutez le contenu de `supabase/schema.sql`, puis les migrations de `supabase/migrations/` (dans l'ordre) si le schéma est déjà en place.
    - Crée les tables `users`, `artworks`, `orders`, `withdrawals`, `settings`, `pending_users`.
    - Active la **Row Level Security** sur toutes les tables.
    - Crée les comptes de démonstration dans **Supabase Auth**.

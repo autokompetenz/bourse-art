@@ -483,6 +483,13 @@ export default function Home() {
               <Reveal key={a.id} delay={(i % 3) * 80}>
                 <div className="group bg-white border border-dark_border/25 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition h-full">
                   <div className={`relative h-56 bg-gradient-to-br ${a.gradient}`}>
+                    {a.image_url && (
+                      <img
+                        src={a.image_url}
+                        alt={a.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-black/20 transition" />
                     <span className="absolute top-4 left-4 chip bg-white/90 !text-primary">
                       {a.description || "Œuvre d'art"}

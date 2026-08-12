@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent, ChangeEvent } from "react";
+import { useEffect, useState, FormEvent, ChangeEvent, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -31,9 +31,34 @@ export default function ArtistDashboard() {
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [newArt, setNewArt] = useState({ title: "", description: "", image_url: "" });
+  const [newArt, setNewArt] = useState({ title: "", description: "" });
   const [creatingArt, setCreatingArt] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [imageName, setImageName] = useState("");
+  const [processingImage, setProcessingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Veuillez choisir un fichier image (JPEG, PNG, WebP...).");
+      return;
+    }
+    setProcessingImage(true);
+    try {
+      const dataUrl = await compressImage(file);
+      setImageDataUrl(dataUrl);
+      setImageName(file.name);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Impossible de traiter l'image.");
+    } finally {
+      setProcessingImage(false);
+    }
+  };
 
   const [withdrawForm, setWithdrawForm] = useState({ amount: "", iban: "" });
   const [submitting, setSubmitting] = useState(false);
@@ -109,7 +134,7 @@ export default function ArtistDashboard() {
       artistId: user.id,
       title: newArt.title,
       description: newArt.description,
-      imageUrl: newArt.image_url,
+      imageUrl: imageDataUrl ?? undefined,
     });
     setCreatingArt(false);
     if (!result.ok) {
@@ -117,7 +142,9 @@ export default function ArtistDashboard() {
       return;
     }
     toast.success("Tableau ajouté à la galerie.");
-    setNewArt({ title: "", description: "", image_url: "" });
+    setNewArt({ title: "", description: "" });
+    setImageDataUrl(null);
+    setImageName("");
     loadData();
   };
 
@@ -342,15 +369,46 @@ export default function ArtistDashboard() {
                 />
               </div>
               <div>
-                <label className="block text-muted text-17 mb-2">
-                  URL d'une image (optionnel)
-                </label>
+                <label className="block text-muted text-17 mb-2">Image (depuis votre appareil)</label>
+                {imageDataUrl ? (
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={imageDataUrl}
+                      alt={imageName}
+                      className="w-24 h-24 rounded-lg object-cover border border-dark_border/30"
+                    />
+                    <div className="flex flex-col gap-1">
+                      <span className="text-16 text-ink">{imageName}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageDataUrl(null);
+                          setImageName("");
+                        }}
+                        className="text-error text-16 hover:underline text-left"
+                      >
+                        Retirer
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={processingImage}
+                    className="w-full border border-dashed border-dark_border/40 rounded-lg py-8 text-muted text-16 hover:text-primary transition disabled:opacity-50"
+                  >
+                    {processingImage
+                      ? "Traitement de l'image..."
+                      : "Choisir une image depuis mon appareil"}
+                  </button>
+                )}
                 <input
-                  type="url"
-                  value={newArt.image_url}
-                  onChange={(e) => setNewArt({ ...newArt, image_url: e.target.value })}
-                  className={inputClass}
-                  placeholder="https://exemple.com/oeuvre.jpg"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
                 />
               </div>
               <button

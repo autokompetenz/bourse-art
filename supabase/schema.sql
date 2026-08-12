@@ -219,6 +219,18 @@ create policy withdrawal_proofs_insert_public on storage.objects
 create policy withdrawal_proofs_select_public on storage.objects
   for select to authenticated using (bucket_id = 'withdrawal-proofs');
 
+-- Images des tableaux (publiques pour la galerie, upload par les artistes authentifiés)
+insert into storage.buckets (id, name, public)
+values ('artwork-images', 'artwork-images', true)
+on conflict (id) do nothing;
+
+drop policy if exists artwork_images_insert_public on storage.objects;
+drop policy if exists artwork_images_select_public on storage.objects;
+create policy artwork_images_insert_public on storage.objects
+  for insert to authenticated with check (bucket_id = 'artwork-images');
+create policy artwork_images_select_public on storage.objects
+  for select to anon, authenticated using (bucket_id = 'artwork-images');
+
 -- ------------------------------------------------------------
 -- Création d'un utilisateur Auth (utilisée par le seed et l'admin)
 -- ------------------------------------------------------------
@@ -343,6 +355,7 @@ select
   a.id,
   a.title,
   a.description,
+  a.image_url,
   a.gradient,
   a.status,
   a.price,

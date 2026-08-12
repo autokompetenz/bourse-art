@@ -1,6 +1,7 @@
 import { supabase, supabaseConfig } from "./supabase";
 import { demoCreateArtist, getDemoUsers } from "./auth";
 import { dataUrlToBlob } from "@/utils/image";
+import { notifyArtistOfSale } from "./email";
 
 export type ArtworkRecord = {
   id: string;
@@ -204,6 +205,7 @@ export async function createArtwork(input: {
 }): Promise<OpResult> {
   const title = input.title.trim();
   if (!title) return { ok: false, error: "Le titre est obligatoire." };
+  let imageUrl: string | null = input.imageUrl?.trim() || null;
   if (!supabaseConfig.configured) {
     const db = ensureDemoSeed(readDemoDb());
     const rows = normalize<ArtworkRecord>(db.artworks as ArtworkRecord[]);
@@ -212,7 +214,7 @@ export async function createArtwork(input: {
       artist_id: input.artistId,
       title,
       description: input.description?.trim() || null,
-      image_url: input.imageUrl?.trim() || null,
+      image_url: imageUrl,
       status: "negotiation",
       buyer_name: null,
       negotiation_date: null,
@@ -223,12 +225,22 @@ export async function createArtwork(input: {
     writeDemoDb({ ...db, artworks: rows });
     return { ok: true };
   }
+  try {
+    if (imageUrl && imageUrl.startsWith("data:")) {
+      imageUrl = await uploadArtworkImage(imageUrl);
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Impossible de téléverser l'image.",
+    };
+  }
   const { error } = await supabase.from("artworks").insert([
     {
       artist_id: input.artistId,
       title,
       description: input.description?.trim() || null,
-      image_url: input.imageUrl?.trim() || null,
+      image_url: imageUrl,
       gradient: gradientFor(title),
     },
   ]);
@@ -283,7 +295,8 @@ export async function markArtworkSold(input: {
     })
     .eq("id", input.id);
   if (error) return { ok: false, error: error.message };
-  return { ok: true };
+  const notification = await notifyArtistOfSale(input.id);
+  return { ok: true, data: { notification } };
 }
 
 export async function revertArtwork(id: string): Promise<OpResult> {
@@ -338,6 +351,20 @@ async function uploadOrderImage(dataUrl: string): Promise<string> {
     .upload(path, blob, { contentType: blob.type, upsert: false });
   if (error) throw new Error(`Impossible de téléverser l'image : ${error.message}`);
   const { data } = supabase.storage.from(ORDER_IMAGES_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+const ARTWORK_IMAGES_BUCKET = "artwork-images";
+
+async function uploadArtworkImage(dataUrl: string): Promise<string> {
+  const blob = dataUrlToBlob(dataUrl);
+  const ext = blob.type === "image/png" ? "png" : "jpg";
+  const path = `artworks/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+  const { error } = await supabase.storage
+    .from(ARTWORK_IMAGES_BUCKET)
+    .upload(path, blob, { contentType: blob.type, upsert: false });
+  if (error) throw new Error(`Impossible de téléverser l'image : ${error.message}`);
+  const { data } = supabase.storage.from(ARTWORK_IMAGES_BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
 
@@ -641,6 +668,32 @@ export async function listCards(): Promise<CardWithArtist[]> {
 /* ---------------------------------------------------------------- */
 /* Users (admin)                                                     */
 /* ---------------------------------------------------------------- */
+
+export type ArtistRecord = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  created_at: string;
+  artworks_count: number;
+};
+
+export async function listArtists(): Promise<ArtistRecord[]> {
+  if (!supabaseConfig.configured) {
+    return getDemoUsers()
+      .filter((u) => u.role === "artist")
+      .map((u, i) => ({ ...u, created_at: "", artworks_count: 0 }));
+  }
+  const { data, error } = await supabase
+    .from("users")
+    .select(
+      "id, name, email, role, created_at, artworks_count:artworks(count)"
+    )
+    .eq("role", "artist")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return normalize<ArtistRecord>(data);
+}
 
 export async function createArtistAccount(
   name: string,

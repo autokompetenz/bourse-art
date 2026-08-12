@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
 import {
+  ArtistRecord,
   ArtworkRecord,
   CardWithArtist,
   OrderRecord,
@@ -10,6 +11,7 @@ import {
   createArtistAccount,
   deleteArtwork,
   getSettings,
+  listArtists,
   listArtworks,
   listCards,
   listOrders,
@@ -21,6 +23,7 @@ import {
 } from "@/lib/db";
 import { formatDate, formatChf, maskCard } from "@/utils/format";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import type { EmailResult } from "@/lib/email";
 
 const PAGE_SIZE = 8;
 
@@ -81,6 +84,7 @@ export default function AdminDashboard() {
 
   const [tab, setTab] = useState<"ventes" | "comptes" | "cartes" | "commandes" | "retraits">("ventes");
   const [artworks, setArtworks] = useState<ArtworkRecord[]>([]);
+  const [artists, setArtists] = useState<ArtistRecord[]>([]);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
   const [cards, setCards] = useState<CardWithArtist[]>([]);
@@ -122,14 +126,16 @@ export default function AdminDashboard() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [artRes, ordRes, wdRes, setRes, cardRes] = await Promise.all([
+      const [artRes, ordRes, wdRes, setRes, cardRes, artistRes] = await Promise.all([
         listArtworks(),
         listOrders(),
         listWithdrawals(),
         getSettings(),
         listCards(),
+        listArtists(),
       ]);
       setArtworks(artRes);
+      setArtists(artistRes);
       setOrders(ordRes);
       setWithdrawals(wdRes);
       setIban(setRes?.iban ?? "");
@@ -222,7 +228,18 @@ export default function AdminDashboard() {
       toast.error(result.error);
       return;
     }
-    toast.success("Vente enregistrée. Le solde de l'artiste est mis à jour.");
+    const notification = (result.data as { notification?: EmailResult } | undefined)
+      ?.notification;
+    if (notification?.status === "sent") {
+      toast.success("Vente enregistrée. L'artiste a été notifié par email.");
+    } else {
+      toast.success("Vente enregistrée. Le solde de l'artiste est mis à jour.");
+      if (notification?.status === "error") {
+        toast.error(
+          `L'email de notification n'a pas pu être envoyé : ${notification.detail ?? "erreur inconnue"}`
+        );
+      }
+    }
     setSaleForm({ artworkId: "", buyer_name: "", negotiation_date: "", price: "" });
     loadAll();
   };
@@ -513,6 +530,33 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </form>
+
+            <div className="mt-10">
+              <h3 className="text-ink text-22 font-medium mb-4">
+                Artistes ({artists.length})
+              </h3>
+              {artists.length === 0 ? (
+                <p className="text-muted text-17">Aucun artiste pour le moment.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {artists.map((a) => (
+                    <li
+                      key={a.id}
+                      className="border border-dark_border border-opacity-20 rounded-lg p-4 flex flex-wrap justify-between items-center gap-3"
+                    >
+                      <div>
+                        <p className="text-ink text-18 font-medium">{a.name}</p>
+                        <p className="text-muted text-16">
+                          {a.email} · {a.artworks_count} tableau{a.artworks_count > 1 ? "x" : ""}
+                          {a.created_at ? ` · inscrit le ${formatDate(a.created_at)}` : ""}
+                        </p>
+                      </div>
+                      <span className="chip !text-primary !border-primary/40">Artiste</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
         )}
 

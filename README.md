@@ -33,10 +33,11 @@ npm run dev
 4. Déployez les Edge Functions d'email (SMTP) :
    ```
    supabase login
-   supabase functions deploy notify-artist-sale
-   supabase functions deploy notify-pending-artist
+   supabase link --project-ref asiaqrkldaqotjttmcjd
+   supabase secrets set SMTP_HOST=smtp.hostinger.com SMTP_PORT=465 SMTP_USER=votre-email SMTP_PASSWORD=votre-mdp SMTP_FROM="Bourse&Art <votre-email>" SITE_URL=https://bourse-art.vercel.app
+   supabase functions deploy notify-artist-sale notify-pending-artist
    ```
-   Les variables `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` et `SITE_URL` doivent être définies dans les secrets de la fonction.
+   Remplissez `SMTP_USER` / `SMTP_PASSWORD` avec de vraies identifiants SMTP (actuellement placeholder). Les variables doivent être définies dans les secrets de la fonction.
 5. Redémarrez `npm run dev`.
 
 ### Emails

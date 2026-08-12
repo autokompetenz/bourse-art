@@ -1,5 +1,6 @@
 import type { User as AuthUser } from "@supabase/supabase-js";
 import { supabase, supabaseConfig } from "./supabase";
+import { sendWelcomeEmail } from "./email";
 
 export type Role = "admin" | "artist";
 
@@ -173,8 +174,9 @@ export function demoDeleteArtist(id: string): boolean {
 }
 
 /**
- * Envoie un magic link par email (via Supabase Auth, sans Edge Function).
- * Le client clique le lien puis définit son mot de passe.
+ * Envoie le mail d'accueil personnalisé (via l'Edge Function `send-welcome-email`)
+ * contenant le lien d'activation. Le client clique le lien puis définit
+ * son mot de passe.
  */
 export async function sendActivationLink(
   email: string
@@ -182,20 +184,13 @@ export async function sendActivationLink(
   if (!isConfigured()) {
     return { ok: false, error: "Mode démo actif : aucun email réel n'est envoyé." };
   }
-  const redirectTo = `${window.location.origin}/connexion?activation=1`;
-  const { error } = await supabase.auth.signInWithOtp({
-    email: email.trim().toLowerCase(),
-    options: {
-      shouldCreateUser: false,
-      emailRedirectTo: redirectTo,
-    },
-  });
-  if (error) {
+  const result = await sendWelcomeEmail(email);
+  if (result.status === "error") {
     return {
       ok: false,
       error:
-        "Le lien d'activation n'a pas pu être envoyé. Vérifiez que l'administrateur a bien créé le compte et que le SMTP est configuré. " +
-        (error.message || ""),
+        "Le mail d'accueil n'a pas pu être envoyé. Vérifiez que l'administrateur a bien créé le compte et que le SMTP est configuré. " +
+        (result.detail ?? ""),
     };
   }
   return { ok: true };

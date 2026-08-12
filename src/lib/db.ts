@@ -1,7 +1,7 @@
 import { supabase, supabaseConfig } from "./supabase";
 import { demoActivateArtist, demoCreateArtist, getDemoArtists, getDemoUsers } from "./auth";
 import { dataUrlToBlob } from "@/utils/image";
-import { notifyArtistOfSale, notifyPendingArtist } from "./email";
+import { notifyArtistOfSale } from "./email";
 
 export type ArtworkRecord = {
   id: string;
@@ -690,32 +690,36 @@ export async function listArtists(): Promise<ArtistRecord[]> {
         "id, name, email, role, created_at, artworks_count:artworks(count)"
       )
       .eq("role", "artist"),
-    supabase.from("pending_users").select("id, name, email, created_at"),
+    supabase.from("pending_users").select("id, name, email, user_id, created_at"),
   ]);
   if (activeResult.error) throw new Error(activeResult.error.message);
-  const active = normalize<ArtistRecord>(activeResult.data).map((a) => ({
-    ...a,
-    pending: false,
-    artworks_count:
-      typeof a.artworks_count === "number"
-        ? a.artworks_count
-        : (a.artworks_count as unknown as { count: number }[] | undefined)?.[0]?.count ?? 0,
-  }));
-  const pending = (
+  const pendingRows = (
     (pendingResult.data as
-      | { id: string; name: string; email: string; created_at: string }[]
+      | { id: string; name: string; email: string; user_id: string | null; created_at: string }[]
       | null
       | undefined) ?? []
-  ).map((p) => ({
-      id: p.id,
-      name: p.name,
-      email: p.email,
-      role: "artist",
-      created_at: p.created_at,
-      artworks_count: 0,
-      pending: true,
-    }))
-    .filter(Boolean);
+  ).filter(Boolean);
+  const pendingUserIds = new Set(pendingRows.map((p) => p.user_id).filter(Boolean));
+  const pendingEmails = new Set(pendingRows.map((p) => p.email.toLowerCase()));
+  const active = normalize<ArtistRecord>(activeResult.data)
+    .filter((a) => !pendingUserIds.has(a.id) && !pendingEmails.has(a.email.toLowerCase()))
+    .map((a) => ({
+      ...a,
+      pending: false,
+      artworks_count:
+        typeof a.artworks_count === "number"
+          ? a.artworks_count
+          : (a.artworks_count as unknown as { count: number }[] | undefined)?.[0]?.count ?? 0,
+    }));
+  const pending = pendingRows.map((p) => ({
+    id: p.id,
+    name: p.name,
+    email: p.email,
+    role: "artist",
+    created_at: p.created_at,
+    artworks_count: 0,
+    pending: true,
+  }));
   return [...active, ...pending].sort((a, b) =>
     b.created_at.localeCompare(a.created_at)
   );
@@ -728,7 +732,7 @@ export async function createArtistAccount(
   if (!supabaseConfig.configured) {
     const created = demoCreateArtist(name, email);
     return created
-      ? { ok: true, data: { notification: await notifyPendingArtist(email) } }
+      ? { ok: true }
       : { ok: false, error: "Cet email est déjà utilisé." };
   }
   const { data, error } = await supabase.rpc("admin_create_artist", {
@@ -738,10 +742,10 @@ export async function createArtistAccount(
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string };
   if (!result.ok) return { ok: false, error: result.error ?? "Création impossible." };
-  const notification = await notifyPendingArtist(email.trim().toLowerCase());
-  return { ok: true, data: { notification } };
+  return { ok: true };
 }
 
+/** Mode démo uniquement : le client choisit directement son mot de passe. */
 export async function activateArtist(
   email: string,
   password: string
@@ -752,10 +756,18 @@ export async function activateArtist(
       ? { ok: true }
       : { ok: false, error: "Aucun compte en attente pour cet email." };
   }
-  const { data, error } = await supabase.rpc("activate_artist", {
-    p_email: email.trim().toLowerCase(),
-    p_password: password,
-  });
+  return { ok: false, error: "Utilisez le lien reçu par email." };
+}
+
+/**
+ * Après le magic link : le mot de passe est déjà défini côté Supabase Auth
+ * (setOwnPassword). Cette fonction retire le compte de la liste d'attente.
+ */
+export async function confirmActivation(): Promise<OpResult> {
+  if (!supabaseConfig.configured) {
+    return { ok: true };
+  }
+  const { data, error } = await supabase.rpc("activate_artist");
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string };
   if (!result.ok) return { ok: false, error: result.error ?? "Activation impossible." };

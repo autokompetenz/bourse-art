@@ -160,6 +160,48 @@ export function demoActivateArtist(email: string, password: string): boolean {
   return true;
 }
 
+/**
+ * Envoie un magic link par email (via Supabase Auth, sans Edge Function).
+ * Le client clique le lien puis définit son mot de passe.
+ */
+export async function sendActivationLink(
+  email: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isConfigured()) {
+    return { ok: false, error: "Mode démo actif : aucun email réel n'est envoyé." };
+  }
+  const redirectTo = `${window.location.origin}/connexion?activation=1`;
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim().toLowerCase(),
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: redirectTo,
+    },
+  });
+  if (error) {
+    return {
+      ok: false,
+      error:
+        "Aucun compte en attente pour cet email, ou lien impossible à envoyer. Vérifiez que l'administrateur a bien créé votre compte.",
+    };
+  }
+  return { ok: true };
+}
+
+/** Définit le mot de passe du client connecté (après magic link). */
+export async function setOwnPassword(
+  password: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isConfigured()) {
+    return { ok: false, error: "Mode démo actif : connexion Supabase requise." };
+  }
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
 export type DemoArtistAccount = {
   id: string;
   name: string;

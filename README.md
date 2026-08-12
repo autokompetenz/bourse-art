@@ -30,20 +30,14 @@ npm run dev
    - Crée les comptes de démonstration dans **Supabase Auth**.
    - Crée les fonctions RPC sécurisées : `request_withdrawal` (frais de 20 % vérifiés côté serveur), `admin_create_artist` (nom + email) et `activate_artist` (le client définit son mot de passe).
 3. Copiez l'URL du projet et la clé `anon public` (Project Settings → API) dans `.env`.
-4. Déployez les Edge Functions d'email (SMTP) :
-   ```
-   supabase login
-   supabase link --project-ref asiaqrkldaqotjttmcjd
-   supabase secrets set SMTP_HOST=smtp.hostinger.com SMTP_PORT=465 SMTP_USER=votre-email SMTP_PASSWORD=votre-mdp SMTP_FROM="Bourse&Art <votre-email>" SITE_URL=https://bourse-art.vercel.app
-   supabase functions deploy notify-artist-sale notify-pending-artist
-   ```
-   Remplissez `SMTP_USER` / `SMTP_PASSWORD` avec de vraies identifiants SMTP (actuellement placeholder). Les variables doivent être définies dans les secrets de la fonction.
-5. Redémarrez `npm run dev`.
+4. Configurez le SMTP dans le dashboard Supabase (Authentication → SMTP) avec de vraies identifiants. Le magic link est envoyé par Supabase Auth lui-même, **aucune Edge Function n'est requise**.
+5. Personnalisez le template du magic link (Authentication → Email Templates → Magic Link) avec le lien `{{ .RedirectTo }}`.
+6. Redémarrez `npm run dev`.
 
 ### Emails
 
-- **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification (`notify-artist-sale`).
-- **Invitation** : à la création d'un compte par l'admin, le client reçoit un email l'invitant à définir son mot de passe sur la page de connexion, onglet « Inscription » (`notify-pending-artist`).
+- **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification via l'Edge Function `notify-artist-sale` (SMTP à configurer dans les secrets de la fonction).
+- **Invitation** : à la création d'un compte par l'admin, le client reçoit un **magic link** envoyé par Supabase Auth (aucune Edge Function). En cliquant, il arrive sur `/connexion?activation=1` et choisit lui-même son mot de passe.
 
 ### Authentification
 

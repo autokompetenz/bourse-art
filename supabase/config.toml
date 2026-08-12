@@ -2,6 +2,3 @@ project_id = "bourse-art"
 
 [functions.notify-artist-sale]
 verify_jwt = false
-
-[functions.notify-pending-artist]
-verify_jwt = false

@@ -174,7 +174,7 @@ export default function ArtistDashboard() {
       return;
     }
     if (!platformIban) {
-      toast.error("L'adresse de paiement n'est pas encore configurée. Contactez l'administrateur.");
+      toast.error("L'adresse de paiement n'est pas encore configurée. Contactez Bourse&Art.");
       return;
     }
     setPendingAmount(amount);
@@ -191,7 +191,7 @@ export default function ArtistDashboard() {
       toast.error(result.error);
       return;
     }
-    toast.success("Demande de retrait envoyée. Elle sera traitée par l'admin.");
+    toast.success("Demande de retrait envoyée. Elle sera traitée par Bourse&Art.");
     setWithdrawForm({ amount: "", iban: "" });
     setPendingAmount(null);
     loadData();
@@ -499,7 +499,7 @@ export default function ArtistDashboard() {
             <h2 className="text-ink text-24 font-medium mb-4">Demander un retrait</h2>
             <p className="text-muted text-17 mb-6">
               Saisissez le montant à retirer et votre IBAN. Votre demande sera
-              traitée par l'administrateur.
+              traitée par Bourse&Art.
             </p>
             <form onSubmit={handleWithdraw}>
               <div className="mb-4">

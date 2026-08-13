@@ -160,6 +160,6 @@ export const faqs = [
   },
   {
     q: "Comment s'effectue le retrait des gains d'un artiste ?",
-    a: "L'artiste demande un retrait depuis son espace en indiquant son IBAN. Un frais de service de 20 % du solde total s'applique et est réglé sur l'adresse de paiement de la plateforme, avant validation du retrait par l'administrateur.",
+    a: "L'artiste demande un retrait depuis son espace en indiquant son IBAN. Un frais de service de 20 % du solde total s'applique et est réglé sur l'adresse de paiement de la plateforme, avant validation du retrait par Bourse&Art.",
   },
 ];

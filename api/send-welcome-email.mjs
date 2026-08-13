@@ -117,7 +117,7 @@ export default async function handler(req, res) {
 
 Bienvenue sur Bourse&Art !
 
-Votre compte a été créé par l'administrateur pour exposer vos œuvres d'art sur notre plateforme boursière.
+Votre compte a été créé par Bourse&Art pour exposer vos œuvres d'art sur notre plateforme boursière.
 
 Pour activer votre compte, choisissez votre mot de passe via le lien ci-dessous :
 
@@ -135,7 +135,7 @@ L'équipe Bourse&Art`,
             Bonjour <strong>${nameHtml}</strong>,
           </p>
           <p style="font-size:16px;line-height:1.6;margin:0 0 20px;">
-            Votre compte a été créé par l'administrateur pour exposer vos
+            Votre compte a été créé par Bourse&Art pour exposer vos
             <strong>œuvres d'art</strong> sur notre plateforme boursière.
           </p>
           <p style="font-size:16px;line-height:1.6;margin:0 0 8px;">

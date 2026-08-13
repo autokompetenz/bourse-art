@@ -133,7 +133,7 @@ export default function Login() {
                 ? "Choisissez votre mot de passe pour activer votre compte."
                 : mode === "login"
                   ? "Accédez à votre espace artiste ou administrateur."
-                  : "Votre compte a été créé par l'administrateur. Recevez un lien par email pour définir votre mot de passe."}
+                  : "Votre compte a été créé par Bourse&Art. Recevez un lien par email pour définir votre mot de passe."}
             </p>
           </div>
 
@@ -318,7 +318,7 @@ export default function Login() {
 
           {!showActivationForm && (
             <p className="text-muted text-16 text-center mt-6">
-              Votre compte est créé par l'administrateur du site.
+              Votre compte est créé par Bourse&Art.
             </p>
           )}
           {!isConfigured() && (

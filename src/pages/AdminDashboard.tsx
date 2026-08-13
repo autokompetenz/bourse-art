@@ -94,7 +94,7 @@ export default function AdminDashboard() {
   const [iban, setIban] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
+  const [newUser, setNewUser] = useState({ name: "", email: "" });
   const [creatingUser, setCreatingUser] = useState(false);
 
   const [saleForm, setSaleForm] = useState<{
@@ -212,12 +212,8 @@ export default function AdminDashboard() {
       toast.error("Le nom et l'email sont obligatoires.");
       return;
     }
-    if (newUser.password.length < 6) {
-      toast.error("Le mot de passe doit contenir au moins 6 caractères.");
-      return;
-    }
     setCreatingUser(true);
-    const result = await createArtistAccount(newUser.name, newUser.email, newUser.password);
+    const result = await createArtistAccount(newUser.name, newUser.email);
     setCreatingUser(false);
     if (!result.ok) {
       toast.error(result.error);
@@ -231,10 +227,10 @@ export default function AdminDashboard() {
       toast.error(`Mail non envoyé : ${emailResult.emailDetail ?? "erreur inconnue"}`);
     } else {
       toast.success(
-        "Compte créé. L'artiste a reçu un email avec ses identifiants de connexion."
+        "Compte créé. L'artiste a reçu un email avec un lien pour définir son mot de passe."
       );
     }
-    setNewUser({ name: "", email: "", password: "" });
+    setNewUser({ name: "", email: "" });
     loadAll();
   };
 
@@ -685,8 +681,9 @@ export default function AdminDashboard() {
           <section className="border border-dark_border/25 rounded-xl p-6 bg-white">
             <h2 className="text-ink text-24 font-medium mb-6">Créer un compte artiste</h2>
             <p className="text-muted text-17 mb-6">
-              Vous définissez le mot de passe de connexion de l'artiste. Il est
-              envoyé par email et reste visible ci-dessous dans la liste.
+              L'artiste choisit lui-même son mot de passe : il reçoit un email avec
+              un lien pour l'activer. Le compte reste « en attente d'inscription »
+              tant qu'il n'a pas été activé.
             </p>
             <form onSubmit={handleCreateUser} className="grid md:grid-cols-2 gap-6">
               <div>
@@ -709,18 +706,6 @@ export default function AdminDashboard() {
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   className={inputClass}
                   placeholder="artiste@exemple.com"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-muted text-17 mb-2">Mot de passe</label>
-                <input
-                  type="text"
-                  required
-                  minLength={6}
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  className={inputClass}
-                  placeholder="6 caractères minimum"
                 />
               </div>
               <div className="md:col-span-2">

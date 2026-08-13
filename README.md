@@ -28,13 +28,13 @@ npm run dev
    - Crée les tables `users`, `artworks`, `orders`, `withdrawals`, `settings`, `pending_users`.
    - Active la **Row Level Security** sur toutes les tables.
    - Crée les comptes de démonstration dans **Supabase Auth**.
-   - Crée les fonctions RPC sécurisées : `request_withdrawal` (frais de 20 % vérifiés côté serveur), `admin_create_artist` (nom + email + mot de passe, stocké en clair dans `users.password_plain` pour l'affichage admin), `activate_artist` (nettoyage après changement de mot de passe) et `admin_delete_artist` (suppression définitive d'un utilisateur par l'admin).
+   - Crée les fonctions RPC sécurisées : `request_withdrawal` (frais de 20 % vérifiés côté serveur), `admin_create_artist` (nom + email uniquement ; l'artiste choisit lui-même son mot de passe via le lien du mail de bienvenue), `activate_artist` (retrait de la liste d'attente après activation) et `admin_delete_artist` (suppression définitive d'un utilisateur par l'admin).
 3. Copiez l'URL du projet et la clé `anon public` (Project Settings → API) dans `.env`.
 4. Redémarrez `npm run dev`.
 
 ### Emails
 
-- **Bienvenue / invitation** : à la création d'un compte par l'admin, le mail d'accueil personnalisé est envoyé par la **fonction serverless Vercel** `/api/send-welcome-email` via le SMTP de la plateforme (Hostinger). Il contient les identifiants de connexion (email + mot de passe choisi par l'admin) et un lien de récupération pour changer le mot de passe, pointant vers `SITE_URL` (jamais localhost). Aucun mail générique de Supabase n'est envoyé ; en cas d'échec de l'API, une erreur claire est affichée à l'admin (l'API n'existe qu'en production).
+- **Bienvenue / invitation** : à la création d'un compte par l'admin (nom + email), le mail d'accueil personnalisé est envoyé par la **fonction serverless Vercel** `/api/send-welcome-email` via le SMTP de la plateforme (Hostinger). Il contient un lien (type recovery) qui permet à l'artiste de **choisir lui-même son mot de passe**, pointant vers `SITE_URL` (jamais localhost). Aucun mail générique de Supabase n'est envoyé ; en cas d'échec de l'API, une erreur claire est affichée à l'admin (l'API n'existe qu'en production).
 - **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification via la **fonction serverless Vercel** `/api/send-sale-notification` (même infrastructure SMTP que le mail de bienvenue).
 
 Variables d'environnement à configurer sur Vercel (Project Settings → Environment Variables) :

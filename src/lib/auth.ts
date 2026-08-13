@@ -132,7 +132,7 @@ export function getDemoUsers(): Profile[] {
     .map(({ password: _ignored, ...user }) => user);
 }
 
-export function demoCreateArtist(name: string, email: string, password: string): boolean {
+export function demoCreateArtist(name: string, email: string): boolean {
   if (isConfigured()) return false;
   const users = readDemoUsers();
   const emailNormalized = email.trim().toLowerCase();
@@ -141,7 +141,7 @@ export function demoCreateArtist(name: string, email: string, password: string):
     id: `demo-${Date.now()}`,
     name: name.trim(),
     email: emailNormalized,
-    password,
+    password: null,
     role: "artist",
   };
   localStorage.setItem(DEMO_USERS_KEY, JSON.stringify([...users, newUser]));

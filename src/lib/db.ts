@@ -743,11 +743,10 @@ export async function listArtists(): Promise<ArtistRecord[]> {
 
 export async function createArtistAccount(
   name: string,
-  email: string,
-  password: string
+  email: string
 ): Promise<OpResult> {
   if (!supabaseConfig.configured) {
-    const created = demoCreateArtist(name, email, password);
+    const created = demoCreateArtist(name, email);
     return created
       ? { ok: true }
       : { ok: false, error: "Cet email est déjà utilisé." };
@@ -755,7 +754,6 @@ export async function createArtistAccount(
   const { data, error } = await supabase.rpc("admin_create_artist", {
     p_name: name.trim(),
     p_email: email.trim().toLowerCase(),
-    p_password: password,
   });
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string };

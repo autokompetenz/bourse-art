@@ -10,9 +10,10 @@ create table if not exists public.users (
 -- Migration : l'ancien hash client n'est plus utilisé
 alter table public.users drop column if exists password_hash;
 
--- Copie lisible du mot de passe défini par l'admin à la création du compte
--- (affichée dans l'espace admin). Conservée : l'admin garde la possibilité
--- de voir le mot de passe du client.
+-- Copie lisible du mot de passe, renseignée uniquement pour les comptes de
+-- démonstration et les anciens comptes créés avec un mot de passe par l'admin.
+-- Depuis, le client choisit lui-même son mot de passe via le lien du mail de
+-- bienvenue : password_plain reste NULL pour ces comptes.
 alter table public.users add column if not exists password_plain text;
 
 -- Œuvres des artistes
@@ -327,20 +328,21 @@ create policy pending_users_delete_admin on public.pending_users
   for delete using (public.is_admin());
 
 -- ------------------------------------------------------------
--- RPC : l'admin crée un compte artiste (nom, email et mot de passe).
--- L'utilisateur Supabase Auth est créé avec ce mot de passe ; il est aussi
--- enregistré en clair dans users.password_plain pour être affiché dans
--- l'espace admin et communiqué à l'artiste. Le compte est actif
--- immédiatement (plus de file d'attente d'activation).
+-- RPC : l'admin crée un compte artiste (nom et email uniquement).
+-- Un mot de passe temporaire aléatoire est défini côté Auth ; l'artiste
+-- choisit lui-même son mot de passe via le lien recovery du mail de
+-- bienvenue. Le compte reste "en attente d'inscription" (pending_users)
+-- tant qu'il n'a pas été activé.
 -- ------------------------------------------------------------
 drop function if exists public.admin_create_artist(text, text);
 drop function if exists public.admin_create_artist(text, text, text);
-create or replace function public.admin_create_artist(p_name text, p_email text, p_password text)
+create or replace function public.admin_create_artist(p_name text, p_email text)
 returns json
 language plpgsql security definer set search_path = public, extensions
 as $$
 declare
   v_uid uuid;
+  v_temp_password text;
 begin
   if not public.is_admin() then
     return json_build_object('ok', false, 'error', 'Accès refusé.');
@@ -351,28 +353,24 @@ begin
   if p_email is null or position('@' in btrim(p_email)) = 0 then
     return json_build_object('ok', false, 'error', 'Email invalide.');
   end if;
-  if p_password is null or length(p_password) < 6 then
-    return json_build_object('ok', false, 'error', 'Le mot de passe doit contenir au moins 6 caractères.');
-  end if;
   if exists (select 1 from public.pending_users where lower(email) = lower(btrim(p_email)))
      or exists (select 1 from auth.users where lower(email) = lower(btrim(p_email))) then
     return json_build_object('ok', false, 'error', 'Cet email est déjà utilisé.');
   end if;
-  v_uid := public.create_auth_user(btrim(p_name), lower(btrim(p_email)), p_password, 'artist');
-  update public.users set password_plain = p_password where id = v_uid;
+  v_temp_password := substr(md5(gen_random_uuid()::text), 1, 12);
+  v_uid := public.create_auth_user(btrim(p_name), lower(btrim(p_email)), v_temp_password, 'artist');
+  insert into public.pending_users (user_id, name, email)
+  values (v_uid, btrim(p_name), lower(btrim(p_email)));
   return json_build_object('ok', true, 'id', v_uid);
 end;
 $$;
 
-grant execute on function public.admin_create_artist(text, text, text) to authenticated;
+grant execute on function public.admin_create_artist(text, text) to authenticated;
 
 -- ------------------------------------------------------------
--- RPC : fin d'activation. L'artiste a éventuellement défini son propre
--- mot de passe via le lien recovery : on retire le compte de la liste
--- d'attente (idempotent). La copie lisible admin (password_plain) est
--- conservée pour que l'admin puisse toujours voir le mot de passe.
--- Sans lien recovery, le compte est déjà actif (mot de passe fourni par
--- l'admin) et cette fonction ne fait rien.
+-- RPC : fin d'activation. Après avoir défini son mot de passe via le lien
+-- recovery du mail de bienvenue, l'artiste est connecté : on retire le
+-- compte de la liste d'attente (idempotent).
 -- ------------------------------------------------------------
 drop function if exists public.activate_artist(text, text);
 create or replace function public.activate_artist()

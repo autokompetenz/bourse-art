@@ -162,7 +162,7 @@ drop policy if exists artworks_delete_own on public.artworks;
 create policy artworks_select on public.artworks
   for select using (public.is_admin() or artist_id = auth.uid());
 create policy artworks_insert_artist on public.artworks
-  for insert with check (public.is_artist() and artist_id = auth.uid());
+  for insert with check (public.is_admin() or (public.is_artist() and artist_id = auth.uid()));
 create policy artworks_update_admin on public.artworks
   for update using (public.is_admin());
 create policy artworks_delete_own on public.artworks

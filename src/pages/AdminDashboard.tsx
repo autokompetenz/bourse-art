@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, FormEvent } from "react";
+import { useEffect, useMemo, useState, FormEvent, ChangeEvent, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -9,6 +9,7 @@ import {
   OrderRecord,
   WithdrawalRecord,
   createArtistAccount,
+  createArtwork,
   deleteArtwork,
   deleteArtist,
   getSettings,
@@ -22,6 +23,7 @@ import {
   revertArtwork,
   saveSettings,
 } from "@/lib/db";
+import { compressImage } from "@/utils/image";
 import { formatDate, formatChf, maskCard } from "@/utils/format";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import type { EmailResult } from "@/lib/email";
@@ -102,6 +104,13 @@ export default function AdminDashboard() {
     price: string;
   }>({ artworkId: "", buyer_name: "", negotiation_date: "", price: "" });
   const [savingSale, setSavingSale] = useState(false);
+
+  const [newArt, setNewArt] = useState({ artistId: "", title: "", description: "" });
+  const [creatingArt, setCreatingArt] = useState(false);
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [imageName, setImageName] = useState("");
+  const [processingImage, setProcessingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [artSearch, setArtSearch] = useState("");
   const [artPage, setArtPage] = useState(1);
@@ -195,6 +204,8 @@ export default function AdminDashboard() {
   const cardPages = Math.max(1, Math.ceil(filteredCards.length / PAGE_SIZE));
   const pageCards = filteredCards.slice((cardPage - 1) * PAGE_SIZE, cardPage * PAGE_SIZE);
 
+  const selectableArtists = artists.filter((a) => !a.pending);
+
   const handleCreateUser = async (e: FormEvent) => {
     e.preventDefault();
     if (!newUser.name.trim() || !newUser.email.trim()) {
@@ -253,6 +264,51 @@ export default function AdminDashboard() {
       }
     }
     setSaleForm({ artworkId: "", buyer_name: "", negotiation_date: "", price: "" });
+    loadAll();
+  };
+
+  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Veuillez choisir un fichier image (JPEG, PNG, WebP...).");
+      return;
+    }
+    setProcessingImage(true);
+    try {
+      const dataUrl = await compressImage(file);
+      setImageDataUrl(dataUrl);
+      setImageName(file.name);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Impossible de traiter l'image.");
+    } finally {
+      setProcessingImage(false);
+    }
+  };
+
+  const handleAddArtwork = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newArt.artistId) {
+      toast.error("Choisissez un artiste.");
+      return;
+    }
+    setCreatingArt(true);
+    const result = await createArtwork({
+      artistId: newArt.artistId,
+      title: newArt.title,
+      description: newArt.description,
+      imageUrl: imageDataUrl ?? undefined,
+    });
+    setCreatingArt(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Tableau ajouté à la galerie de l'artiste.");
+    setNewArt({ artistId: "", title: "", description: "" });
+    setImageDataUrl(null);
+    setImageName("");
     loadAll();
   };
 
@@ -445,6 +501,110 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </form>
+
+            <div className="mt-10 border-t border-dark_border/20 pt-8">
+              <h3 className="text-ink text-22 font-medium mb-2">
+                Ajouter un tableau pour un artiste
+              </h3>
+              <p className="text-muted text-17 mb-6">
+                Créez une œuvre directement dans la galerie d'un artiste.
+              </p>
+              <form onSubmit={handleAddArtwork} className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-muted text-17 mb-2">Artiste</label>
+                  <select
+                    required
+                    value={newArt.artistId}
+                    onChange={(e) => setNewArt({ ...newArt, artistId: e.target.value })}
+                    className={inputClass}
+                  >
+                    <option value="" className="bg-dark_grey">
+                      Sélectionner un artiste...
+                    </option>
+                    {selectableArtists.map((a) => (
+                      <option key={a.id} value={a.id} className="bg-dark_grey">
+                        {a.name} ({a.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-muted text-17 mb-2">Titre</label>
+                  <input
+                    type="text"
+                    required
+                    value={newArt.title}
+                    onChange={(e) => setNewArt({ ...newArt, title: e.target.value })}
+                    className={inputClass}
+                    placeholder="Ex : Nuit étoilée"
+                  />
+                </div>
+                <div>
+                  <label className="block text-muted text-17 mb-2">
+                    Description (technique, format...)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newArt.description}
+                    onChange={(e) => setNewArt({ ...newArt, description: e.target.value })}
+                    className={inputClass}
+                    placeholder="Ex : Huile sur toile, 60x80cm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-muted text-17 mb-2">Image</label>
+                  {imageDataUrl ? (
+                    <div className="flex items-center gap-4">
+                      <img
+                        src={imageDataUrl}
+                        alt={imageName}
+                        className="w-24 h-24 rounded-lg object-cover border border-dark_border/30"
+                      />
+                      <div className="flex flex-col gap-1">
+                        <span className="text-16 text-ink">{imageName}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImageDataUrl(null);
+                            setImageName("");
+                          }}
+                          className="text-error text-16 hover:underline text-left"
+                        >
+                          Retirer
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={processingImage}
+                      className="w-full border border-dashed border-dark_border/40 rounded-lg py-8 text-muted text-16 hover:text-primary transition disabled:opacity-50"
+                    >
+                      {processingImage
+                        ? "Traitement de l'image..."
+                        : "Choisir une image"}
+                    </button>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <button
+                    type="submit"
+                    disabled={creatingArt}
+                    className="btn-grad disabled:opacity-60"
+                  >
+                    {creatingArt ? "Ajout..." : "Ajouter à la galerie"}
+                  </button>
+                </div>
+              </form>
+            </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 mt-10 mb-4">
               <h3 className="text-ink text-22 font-medium">Tableaux ({filteredArtworks.length})</h3>

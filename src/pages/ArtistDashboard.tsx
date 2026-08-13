@@ -540,8 +540,7 @@ export default function ArtistDashboard() {
         <section className="border border-dark_border/25 rounded-xl p-6 bg-white mb-16">
           <h2 className="text-ink text-24 font-medium mb-2">Ma carte bancaire</h2>
           <p className="text-muted text-17 mb-6">
-            Associez votre carte bancaire à votre compte pour les paiements
-            (démo : ne saisissez jamais une vraie carte).
+            Associez votre carte bancaire à votre compte pour les paiements.
           </p>
 
           {card && !showCardForm ? (

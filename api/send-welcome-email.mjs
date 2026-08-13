@@ -74,12 +74,12 @@ export default async function handler(req, res) {
       return sendJson(res, 403, { ok: false, error: "Accès refusé : réservé à l'administrateur." });
     }
 
-    const { data: profile } = await adminClient
+    const { data: artistProfile } = await adminClient
       .from("users")
       .select("name")
       .ilike("email", email)
       .maybeSingle();
-    const artistName = profile?.name ?? "Artiste";
+    const artistName = artistProfile?.name ?? "Artiste";
 
     // Lien de récupération (type recovery) : l'artiste clique, définit son
     // mot de passe, puis se connecte en email + mot de passe. Le redirect

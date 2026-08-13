@@ -81,7 +81,7 @@ create table if not exists public.cards (
 );
 
 -- Comptes artistes créés par l'admin (nom + email) en attente d'inscription,
--- le client définit lui-même son mot de passe via un magic link Supabase Auth
+-- le client définit lui-même son mot de passe via le lien recovery du mail de bienvenue
 create table if not exists public.pending_users (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.users(id) on delete cascade,
@@ -324,11 +324,11 @@ create policy pending_users_delete_admin on public.pending_users
 -- ------------------------------------------------------------
 -- RPC : l'admin crée un compte artiste (nom + email uniquement).
 -- Un utilisateur Supabase Auth est créé avec un mot de passe temporaire
--- (jamais communiqué) ; le client reçoit un magic link pour définir
--- lui-même son mot de passe.
+-- (jamais communiqué) ; le client reçoit un lien de récupération (recovery)
+-- dans le mail de bienvenue pour définir lui-même son mot de passe.
 -- ------------------------------------------------------------
 -- Supprime l'ancienne signature (nom, email, mot de passe) utilisée avant
--- le passage au magic link : seule la version (nom, email) est conservée.
+-- le passage au lien recovery : seule la version (nom, email) est conservée.
 drop function if exists public.admin_create_artist(text, text, text);
 create or replace function public.admin_create_artist(p_name text, p_email text)
 returns json
@@ -361,7 +361,7 @@ $$;
 grant execute on function public.admin_create_artist(text, text) to authenticated;
 
 -- ------------------------------------------------------------
--- RPC : fin d'activation. Le client (déjà connecté via magic link)
+-- RPC : fin d'activation. Le client (déjà connecté via le lien recovery)
 -- a défini son mot de passe côté Supabase Auth (auth.updateUser).
 -- Cette fonction retire simplement le compte de la liste d'attente.
 -- ------------------------------------------------------------
@@ -531,3 +531,40 @@ where not exists (
     and client_email = 'jean@example.com'
     and description = 'Un portrait abstrait bleu et or, format 50x70.'
 );
+
+-- Dedup des commandes seed : on garde la plus ancienne occurrence par
+-- (client_name, client_email, description).
+delete from public.orders a
+using public.orders b
+where a.id <> b.id
+  and a.client_name = b.client_name
+  and a.client_email = b.client_email
+  and a.description = b.description
+  and a.created_at > b.created_at;
+
+-- ------------------------------------------------------------
+-- Maintenance (idempotente, utile sur les bases existantes) :
+-- purge des lignes d'attente orphelines (leur utilisateur Auth a déjà
+-- été supprimé) et rétablissement de la FK pending_users.user_id -> users
+-- si elle manque, pour que la suppression d'un compte se fasse en un clic.
+-- ------------------------------------------------------------
+delete from public.pending_users p
+where p.user_id is not null
+  and not exists (select 1 from auth.users u where u.id = p.user_id);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public'
+      and t.relname = 'pending_users'
+      and c.conname = 'pending_users_user_id_fkey'
+      and c.contype = 'f'
+  ) then
+    alter table public.pending_users
+      add constraint pending_users_user_id_fkey
+      foreign key (user_id) references public.users(id) on delete cascade;
+  end if;
+end $$;

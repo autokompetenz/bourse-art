@@ -77,11 +77,13 @@ export default async function handler(req, res) {
       .maybeSingle();
     const artistName = pending?.name ?? "Artiste";
 
-    // Magic link Supabase : le lien de confirmation pointe vers SITE_URL
-    // (jamais localhost) car le redirect est généré côté serveur.
+    // Lien de récupération Supabase (type recovery, pas de magic link) :
+    // l'artiste clique, définit son mot de passe, puis se connecte en
+    // email + mot de passe. Le redirect pointe vers SITE_URL (jamais
+    // localhost) car il est généré côté serveur.
     const redirectTo = `${siteUrl}/connexion?activation=1`;
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-      type: "magiclink",
+      type: "recovery",
       email,
       options: { redirectTo, shouldSendEmail: false },
     });
@@ -115,11 +117,11 @@ Bienvenue sur Bourse&Art !
 
 Votre compte a été créé par l'administrateur pour exposer vos œuvres d'art sur notre plateforme boursière.
 
-Pour activer votre espace artiste, cliquez sur le lien ci-dessous puis choisissez votre mot de passe :
+Pour activer votre espace artiste et définir votre mot de passe, cliquez sur le lien ci-dessous :
 
 ${magicLink}
 
-Ce lien est valable 24 heures. Une fois activé, vous pourrez vous connecter avec votre adresse email (${email}) et suivre la cotation de vos œuvres, vos ventes et vos retraits.
+Ce lien est valable quelques heures. Une fois activé, vous pourrez vous connecter avec votre adresse email (${email}) et suivre la cotation de vos œuvres, vos ventes et vos retraits.
 
 L'équipe Bourse&Art`,
       html: `
@@ -133,16 +135,16 @@ L'équipe Bourse&Art`,
             <strong>œuvres d'art</strong> sur notre plateforme boursière.
           </p>
           <p style="font-size:16px;line-height:1.6;margin:0 0 20px;">
-            Pour activer votre espace artiste, cliquez sur le bouton ci-dessous
-            puis choisissez votre mot de passe :
+            Pour activer votre espace artiste et définir votre mot de passe,
+            cliquez sur le bouton ci-dessous :
           </p>
           <a href="${magicLinkHtml}"
              style="display:inline-block;background:#C9A84C;color:#ffffff;text-decoration:none;
                     padding:14px 24px;border-radius:8px;font-size:16px;font-weight:bold;">
-            Activer mon espace artiste
+            Activer mon espace et définir mon mot de passe
           </a>
           <p style="font-size:13px;color:#6b6b70;margin:20px 0 0;line-height:1.5;">
-            Ce lien est valable 24 heures. Une fois activé, connectez-vous avec
+            Ce lien est valable quelques heures. Une fois activé, connectez-vous avec
             <strong>${emailHtml}</strong> pour suivre la cotation de vos œuvres,
             vos ventes et vos retraits.
           </p>

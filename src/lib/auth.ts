@@ -174,9 +174,11 @@ export function demoDeleteArtist(id: string): boolean {
 
 /**
  * Envoie le mail d'accueil personnalisé (SMTP Hostinger via la fonction
- * serverless Vercel `/api/send-welcome-email`). Le lien de confirmation
- * pointe vers SITE_URL (jamais localhost). En cas d'échec (dev local sans
- * API, API non déployée), on retombe sur le mail Magic Link de Supabase.
+ * serverless Vercel `/api/send-welcome-email`). Le lien inclus (type
+ * "recovery") permet à l'artiste de définir son mot de passe puis de se
+ * connecter en email + mot de passe — aucun magic link, aucun mail
+ * générique de Supabase n'est jamais envoyé. En cas d'échec de l'API,
+ * on renvoie une erreur claire au lieu d'envoyer un mail de repli.
  */
 export async function sendActivationLink(
   email: string
@@ -202,54 +204,19 @@ export async function sendActivationLink(
       return { ok: true };
     }
     const apiError = payload?.error ?? `Erreur serveur (${res.status})`;
-    const fallback = await sendViaSupabaseMagicLink(normalized);
-    return fallback.ok
-      ? { ok: true }
-      : { ok: false, error: `${apiError}. Repli Supabase : ${fallback.error}` };
+    return {
+      ok: false,
+      error: `Le mail de bienvenue n'a pas pu être envoyé : ${apiError}. Vérifiez que vous testez sur le site en ligne (l'API d'envoi n'existe qu'en production).`,
+    };
   } catch (err) {
-    const fallback = await sendViaSupabaseMagicLink(normalized);
-    if (fallback.ok) return { ok: true };
     return {
       ok: false,
-      error: `Mail non envoyé : ${err instanceof Error ? err.message : "erreur inconnue"}. ${fallback.error}`,
+      error: `Mail non envoyé : ${err instanceof Error ? err.message : "erreur inconnue"}. Vérifiez que vous testez sur le site en ligne.`,
     };
   }
 }
 
-async function sendViaSupabaseMagicLink(
-  email: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const redirectTo = `${appOrigin()}/connexion?activation=1`;
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      shouldCreateUser: false,
-      emailRedirectTo: redirectTo,
-    },
-  });
-  if (error) {
-    return {
-      ok: false,
-      error: error.message || "erreur inconnue",
-    };
-  }
-  return { ok: true };
-}
-
-/**
- * Origine publique du site pour les liens d'activation.
- * En production (VITE_SITE_URL renseigné), le lien n'est jamais localhost,
- * même dans le repli Supabase Magic Link.
- */
-function appOrigin(): string {
-  const configured = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim();
-  if (configured && !/localhost|127\.0\.0\.1|:\d+$/.test(configured)) {
-    return configured.replace(/\/+$/, "");
-  }
-  return window.location.origin;
-}
-
-/** Définit le mot de passe du client connecté (après magic link). */
+/** Définit le mot de passe du client connecté (après le lien recovery du mail de bienvenue). */
 export async function setOwnPassword(
   password: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {

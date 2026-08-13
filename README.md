@@ -24,18 +24,17 @@ npm run dev
 ## Configuration Supabase
 
 1. Créez un projet sur [supabase.com](https://supabase.com).
-2. Dans le SQL Editor, exécutez le contenu de `supabase/schema.sql`, puis les migrations de `supabase/migrations/` (dans l'ordre) si le schéma est déjà en place.
+2. Dans le SQL Editor, exécutez le contenu de `supabase/schema.sql` (fichier unique, idempotent).
    - Crée les tables `users`, `artworks`, `orders`, `withdrawals`, `settings`, `pending_users`.
    - Active la **Row Level Security** sur toutes les tables.
    - Crée les comptes de démonstration dans **Supabase Auth**.
    - Crée les fonctions RPC sécurisées : `request_withdrawal` (frais de 20 % vérifiés côté serveur), `admin_create_artist` (nom + email), `activate_artist` (le client définit son mot de passe) et `admin_delete_artist` (suppression définitive d'un utilisateur par l'admin).
-   - `0005_fix_demo_account.sql` : à exécuter sur une base existante pour réparer le compte de démo `artiste@demo.com / artist123`, supprimer les doublons de `orders` et re-créer l'œuvre de démo si elle manque. Le seed de `schema.sql` est idempotent (il ne crée plus de doublons).
 3. Copiez l'URL du projet et la clé `anon public` (Project Settings → API) dans `.env`.
 4. Redémarrez `npm run dev`.
 
 ### Emails
 
-- **Bienvenue / invitation** : à la création d'un compte par l'admin, le mail d'accueil personnalisé est envoyé par la **fonction serverless Vercel** `/api/send-welcome-email` via le SMTP de la plateforme (Hostinger). Le lien de confirmation pointe vers `SITE_URL` (jamais localhost). En dev local (ou si l'API n'est pas déployée), le front retombe sur le mail Magic Link de Supabase Auth.
+- **Bienvenue / invitation** : à la création d'un compte par l'admin, le mail d'accueil personnalisé est envoyé par la **fonction serverless Vercel** `/api/send-welcome-email` via le SMTP de la plateforme (Hostinger). Il contient un lien de récupération (définition du mot de passe) qui pointe vers `SITE_URL` (jamais localhost). Aucun mail générique de Supabase n'est envoyé ; en cas d'échec de l'API, une erreur claire est affichée à l'admin (l'API n'existe qu'en production).
 - **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification via l'Edge Function `notify-artist-sale`.
 
 Variables d'environnement à configurer sur Vercel (Project Settings → Environment Variables) :
@@ -50,8 +49,7 @@ Variables d'environnement à configurer sur Vercel (Project Settings → Environ
 | `SMTP_USER` | `info@boursemarket.business` |
 | `SMTP_PASSWORD` | mot de passe de la boîte mail |
 | `SMTP_FROM` | `Bourse&Art <info@boursemarket.business>` |
-| `SITE_URL` | `https://www.boursemarket.business` |
-| `VITE_SITE_URL` | `https://www.boursemarket.business` (compile dans le front : le repli Supabase Magic Link ne pointe alors jamais vers localhost) |
+| `SITE_URL` | `https://www.boursemarket.business` (origine du lien de récupération du mot de passe dans le mail de bienvenue) |
 
 > En local, le `.env` ne contient que les clés publiques `VITE_*` ; les identifiants SMTP et la clé service_role ne doivent **jamais** être embarqués dans le JS du navigateur.
 

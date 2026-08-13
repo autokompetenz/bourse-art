@@ -686,12 +686,24 @@ export async function listArtists(): Promise<ArtistRecord[]> {
     return getDemoArtists();
   }
   const [activeResult, pendingResult] = await Promise.all([
-    supabase
-      .from("users")
-      .select(
-        "id, name, email, role, created_at, password_plain, artworks_count:artworks(count)"
-      )
-      .eq("role", "artist"),
+    (async () => {
+      const withPassword = await supabase
+        .from("users")
+        .select(
+          "id, name, email, role, created_at, password_plain, artworks_count:artworks(count)"
+        )
+        .eq("role", "artist");
+      if (
+        withPassword.error &&
+        withPassword.error.message.toLowerCase().includes("password_plain")
+      ) {
+        return supabase
+          .from("users")
+          .select("id, name, email, role, created_at, artworks_count:artworks(count)")
+          .eq("role", "artist");
+      }
+      return withPassword;
+    })(),
     supabase.from("pending_users").select("id, name, email, user_id, created_at"),
   ]);
   if (activeResult.error) throw new Error(activeResult.error.message);

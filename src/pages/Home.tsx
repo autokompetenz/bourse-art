@@ -342,17 +342,17 @@ export default function Home() {
                     </svg>
                   </div>
                   <div className="grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-dark_border/15 text-center">
-                    <div>
-                      <p className="text-muted text-[12px]">Secteur</p>
-                      <p className="text-ink text-14 font-semibold truncate">{stock.sector}</p>
+                    <div className="min-w-0">
+                      <p className="text-muted text-[10px] sm:text-[12px]">Secteur</p>
+                      <p className="text-ink text-[12px] sm:text-14 font-semibold truncate">{stock.sector}</p>
                     </div>
-                    <div>
-                      <p className="text-muted text-[12px]">Volume</p>
-                      <p className="text-ink text-14 font-semibold">{stock.volume}</p>
+                    <div className="min-w-0">
+                      <p className="text-muted text-[10px] sm:text-[12px]">Volume</p>
+                      <p className="text-ink text-[12px] sm:text-14 font-semibold truncate">{stock.volume}</p>
                     </div>
-                    <div>
-                      <p className="text-muted text-[12px]">Capitalisation</p>
-                      <p className="text-ink text-14 font-semibold">{stock.marketCap}</p>
+                    <div className="min-w-0">
+                      <p className="text-muted text-[10px] sm:text-[12px]">Capitalisation</p>
+                      <p className="text-ink text-[12px] sm:text-14 font-semibold truncate">{stock.marketCap}</p>
                     </div>
                   </div>
                 </article>

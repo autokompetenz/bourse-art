@@ -628,7 +628,7 @@ export default function AdminDashboard() {
                   {pageArtworks.map((art) => (
                     <li
                       key={art.id}
-                      className="border border-dark_border border-opacity-20 rounded-lg p-4 flex items-center gap-4"
+                      className="border border-dark_border border-opacity-20 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-4"
                     >
                       {art.image_url && (
                         <img
@@ -647,7 +647,7 @@ export default function AdminDashboard() {
                           )}
                         </p>
                       </div>
-                      <div className="flex items-center gap-4 shrink-0 ml-auto">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:ml-auto shrink-0">
                         {art.status === "sold" && (
                           <button
                             onClick={() => handleRevert(art.id)}

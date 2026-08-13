@@ -350,7 +350,7 @@ export default function ArtistDashboard() {
                 {sold.map((art) => (
                   <li
                     key={art.id}
-                    className="border border-dark_border border-opacity-20 rounded-lg p-4 flex items-center gap-4"
+                    className="border border-dark_border border-opacity-20 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-4"
                   >
                     {art.image_url && (
                       <img
@@ -385,7 +385,7 @@ export default function ArtistDashboard() {
                 {inNegotiation.map((art) => (
                   <li
                     key={art.id}
-                    className="border border-dark_border border-opacity-20 rounded-lg p-4 flex items-center gap-4"
+                    className="border border-dark_border border-opacity-20 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-4"
                   >
                     {art.image_url && (
                       <img
@@ -398,7 +398,7 @@ export default function ArtistDashboard() {
                       <h4 className="text-ink text-18 font-medium">{art.title}</h4>
                       <p className="text-muted text-16">{art.description}</p>
                     </div>
-                    <div className="flex items-center gap-4 shrink-0 ml-auto">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:ml-auto shrink-0">
                       <span className="text-warning text-18 font-medium">En cours</span>
                       <button
                         onClick={() => handleDeleteArtwork(art.id, art.title)}
@@ -545,7 +545,7 @@ export default function ArtistDashboard() {
 
           {card && !showCardForm ? (
             <div className="max-w-md border border-dark_border border-opacity-20 rounded-lg p-5">
-              <p className="text-ink text-20 font-medium tracking-widest">
+              <p className="text-ink text-16 sm:text-20 font-medium tracking-widest break-all">
                 {card.card_number}
               </p>
               <div className="flex justify-between mt-4 gap-4">

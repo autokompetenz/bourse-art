@@ -35,12 +35,24 @@ npm run dev
 
 ### Emails
 
-- **Bienvenue / invitation** : à la création d'un compte par l'admin, Supabase Auth envoie au client le **template Magic Link** personnalisé (mail d'accueil Bourse&Art contenant le lien `{{ .ConfirmationURL }}`). En cliquant, le client arrive sur `/connexion?activation=1` et choisit lui-même son mot de passe.
+- **Bienvenue / invitation** : à la création d'un compte par l'admin, le mail d'accueil personnalisé est envoyé par la **fonction serverless Vercel** `/api/send-welcome-email` via le SMTP de la plateforme (Hostinger). Le lien de confirmation pointe vers `SITE_URL` (jamais localhost). En dev local (ou si l'API n'est pas déployée), le front retombe sur le mail Magic Link de Supabase Auth.
 - **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification via l'Edge Function `notify-artist-sale`.
 
-Configuration du mail d'accueil (dashboard Supabase) :
-- **SMTP** : Authentication → SMTP Settings, renseigner le SMTP de la plateforme (`smtp.hostinger.com`, port 465, `SMTP_USER`, `SMTP_PASSWORD`).
-- **Template** : Authentication → Email Templates → Magic Link, coller le mail d'accueil Bourse&Art (le lien se met avec `{{ .ConfirmationURL }}`).
+Variables d'environnement à configurer sur Vercel (Project Settings → Environment Variables) :
+
+| Variable | Valeur |
+| --- | --- |
+| `VITE_SUPABASE_URL` | `https://asiaqrkldaqotjttmcjd.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | clé `anon public` |
+| `SUPABASE_SERVICE_ROLE_KEY` | clé `service_role` (serveur uniquement, jamais dans le `.env`) |
+| `SMTP_HOST` | `smtp.hostinger.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_USER` | `info@boursemarket.business` |
+| `SMTP_PASSWORD` | mot de passe de la boîte mail |
+| `SMTP_FROM` | `Bourse&Art <info@boursemarket.business>` |
+| `SITE_URL` | `https://boursemarket.business` |
+
+> En local, le `.env` ne contient que les clés publiques `VITE_*` ; les identifiants SMTP et la clé service_role ne doivent **jamais** être embarqués dans le JS du navigateur.
 
 Déployer l'Edge Function de vente et ses secrets :
 
@@ -65,9 +77,10 @@ L'authentification passe par **Supabase Auth** (JWT), plus aucun hash côté cli
 ## Déploiement Vercel
 
 1. Poussez le projet sur GitHub et importez-le dans Vercel.
-2. Ajoutez les variables d'environnement `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`.
+2. Ajoutez les variables d'environnement (voir « Emails ») : `VITE_*`, `SUPABASE_SERVICE_ROLE_KEY`, `SMTP_*`, `SITE_URL`.
 3. Framework : Vite. Build : `npm run build`. Output : `dist`.
-4. Les routes SPA (`/admin`, `/artiste`, `/commandes`, `/connexion`) sont gérées par le `vercel.json` inclus.
+4. La fonction serverless `/api/send-welcome-email` est déployée automatiquement par Vercel (aucune configuration).
+5. Les routes SPA (`/admin`, `/artiste`, `/commandes`, `/connexion`) sont gérées par le `vercel.json` inclus.
 
 ## Comptes de démonstration
 

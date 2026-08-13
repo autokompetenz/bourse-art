@@ -173,9 +173,10 @@ export function demoDeleteArtist(id: string): boolean {
 }
 
 /**
- * Déclenche l'envoi du mail d'accueil personnalisé (template "Magic Link"
- * personnalisé + SMTP configurés dans le dashboard Supabase). Le client
- * clique le lien puis définit son mot de passe.
+ * Envoie le mail d'accueil personnalisé (SMTP Hostinger via la fonction
+ * serverless Vercel `/api/send-welcome-email`). Le lien de confirmation
+ * pointe vers SITE_URL (jamais localhost). En cas d'échec (dev local sans
+ * API, API non déployée), on retombe sur le mail Magic Link de Supabase.
  */
 export async function sendActivationLink(
   email: string
@@ -183,9 +184,44 @@ export async function sendActivationLink(
   if (!isConfigured()) {
     return { ok: false, error: "Mode démo actif : aucun email réel n'est envoyé." };
   }
+  const normalized = email.trim().toLowerCase();
+
+  try {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+    const res = await fetch("/api/send-welcome-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ email: normalized }),
+    });
+    const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+    if (res.ok && payload?.ok) {
+      return { ok: true };
+    }
+    const apiError = payload?.error ?? `Erreur serveur (${res.status})`;
+    const fallback = await sendViaSupabaseMagicLink(normalized);
+    return fallback.ok
+      ? { ok: true }
+      : { ok: false, error: `${apiError}. Repli Supabase : ${fallback.error}` };
+  } catch (err) {
+    const fallback = await sendViaSupabaseMagicLink(normalized);
+    if (fallback.ok) return { ok: true };
+    return {
+      ok: false,
+      error: `Mail non envoyé : ${err instanceof Error ? err.message : "erreur inconnue"}. ${fallback.error}`,
+    };
+  }
+}
+
+async function sendViaSupabaseMagicLink(
+  email: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const redirectTo = `${window.location.origin}/connexion?activation=1`;
   const { error } = await supabase.auth.signInWithOtp({
-    email: email.trim().toLowerCase(),
+    email,
     options: {
       shouldCreateUser: false,
       emailRedirectTo: redirectTo,
@@ -194,9 +230,7 @@ export async function sendActivationLink(
   if (error) {
     return {
       ok: false,
-      error:
-        "Le mail d'accueil n'a pas pu être envoyé. Vérifiez que l'administrateur a bien créé le compte, puis le template Magic Link et le SMTP dans le dashboard Supabase. " +
-        (error.message || ""),
+      error: error.message || "erreur inconnue",
     };
   }
   return { ok: true };

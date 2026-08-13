@@ -29,22 +29,22 @@ npm run dev
    - Active la **Row Level Security** sur toutes les tables.
    - Crée les comptes de démonstration dans **Supabase Auth**.
    - Crée les fonctions RPC sécurisées : `request_withdrawal` (frais de 20 % vérifiés côté serveur), `admin_create_artist` (nom + email), `activate_artist` (le client définit son mot de passe) et `admin_delete_artist` (suppression définitive d'un utilisateur par l'admin).
+   - `0005_fix_demo_account.sql` : à exécuter sur une base existante pour réparer le compte de démo `artiste@demo.com / artist123`, supprimer les doublons de `orders` et re-créer l'œuvre de démo si elle manque. Le seed de `schema.sql` est idempotent (il ne crée plus de doublons).
 3. Copiez l'URL du projet et la clé `anon public` (Project Settings → API) dans `.env`.
-4. Personnalisez le **template Magic Link** (Authentication → Email Templates → Magic Link) avec le mail d'accueil Bourse&Art (voir « Emails »). Le mail est envoyé par Supabase Auth lui-même.
-5. Redémarrez `npm run dev`.
+4. Redémarrez `npm run dev`.
 
 ### Emails
 
-- **Invitation** : à la création d'un compte par l'admin, Supabase Auth envoie au client le **template Magic Link** personnalisé (mail d'accueil Bourse&Art contenant le lien `{{ .ConfirmationURL }}`). En cliquant, le client arrive sur `/connexion?activation=1` et choisit lui-même son mot de passe.
+- **Bienvenue / invitation** : à la création d'un compte par l'admin, le client reçoit un **mail d'accueil personnalisé** (nom, bouton d'activation) envoyé par l'Edge Function `send-welcome-email` via le SMTP de la plateforme. Le lien contenu est un magic link Supabase : en cliquant, le client arrive sur `/connexion?activation=1` et choisit lui-même son mot de passe.
 - **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification via l'Edge Function `notify-artist-sale`.
 
-Le SMTP de la plateforme (si vous ne voulez pas utiliser l'email par défaut de Supabase) se configure dans le dashboard (Authentication → SMTP) avec `SMTP_HOST`, `SMTP_USER` et `SMTP_PASSWORD`. Les identifiants du `.env` sont réservés à l'Edge Function `notify-artist-sale`.
+Le SMTP se configure côté Supabase via les secrets ci-dessous. Les identifiants du `.env` servent au développement local ; les Edge Functions utilisent leurs propres secrets (`supabase secrets set`).
 
-Déployer l'Edge Function de vente et ses secrets :
+Déployer les Edge Functions et leurs secrets :
 
 ```
-supabase functions deploy notify-artist-sale
-supabase secrets set SMTP_HOST=... SMTP_PORT=465 SMTP_USER=... SMTP_PASSWORD=... SMTP_FROM="Bourse&Art <info@votre-domaine.com>"
+supabase functions deploy notify-artist-sale send-welcome-email
+supabase secrets set SMTP_HOST=smtp.hostinger.com SMTP_PORT=465 SMTP_USER=info@boursemarket.business SMTP_PASSWORD=... SMTP_FROM="Bourse&Art <info@boursemarket.business>" SITE_URL=https://boursemarket.business
 ```
 
 ### Authentification

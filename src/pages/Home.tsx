@@ -92,7 +92,7 @@ export default function Home() {
   useDocumentTitle("Bourse&Art | Actualités boursières & tableaux d'art");
 
   const { stocks, indices, commodities, news, lastUpdate } = useMarket();
-  const { artworks } = useArtworks();
+  const { artworks, loading } = useArtworks();
 
   const topGainers = [...stocks].sort((a, b) => b.changePercent - a.changePercent).slice(0, 4);
   const topLosers = [...stocks].sort((a, b) => a.changePercent - b.changePercent).slice(0, 4);
@@ -478,49 +478,60 @@ export default function Home() {
               </Link>
             </div>
           </Reveal>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {artworks.map((a, i) => (
-              <Reveal key={a.id} delay={(i % 3) * 80}>
-                <div className="group bg-white border border-dark_border/25 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition h-full">
-                  <div className={`relative h-56 bg-gradient-to-br ${a.gradient}`}>
-                    {a.image_url && (
-                      <img
-                        src={a.image_url}
-                        alt={a.title}
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                    )}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-black/20 transition" />
-                    <span className="absolute top-4 left-4 chip bg-white/90 !text-primary">
-                      {a.description || "Œuvre d'art"}
-                    </span>
-                    <span
-                      className={`absolute top-4 right-4 chip ${
-                        a.status === "sold"
-                          ? "bg-white/90 !text-success"
-                          : "bg-white/90 !text-primary"
-                      }`}
-                    >
-                      {a.status === "sold"
-                        ? "Vendu"
-                        : a.price != null
-                          ? formatChf(a.price)
-                          : "Négociation"}
-                    </span>
-                  </div>
-                  <div className="p-5 flex items-center justify-between">
-                    <div>
-                      <h3 className="text-ink text-18 font-bold">{a.title}</h3>
-                      <p className="text-muted text-14">par {a.artist}</p>
+          {loading ? (
+            <p className="text-muted text-16">Chargement des œuvres…</p>
+          ) : artworks.length === 0 ? (
+            <div className="border border-dark_border/15 rounded-xl bg-white/60 px-6 py-16 text-center">
+              <p className="text-ink text-22 font-semibold">La galerie se remplit bientôt</p>
+              <p className="text-muted text-16 mt-3 max-w-md mx-auto">
+                Les œuvres ajoutées par nos artistes partenaires apparaîtront ici dès leur mise en ligne.
+              </p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {artworks.map((a, i) => (
+                <Reveal key={a.id} delay={(i % 3) * 80}>
+                  <div className="group bg-white border border-dark_border/25 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition h-full">
+                    <div className={`relative h-56 bg-gradient-to-br ${a.gradient}`}>
+                      {a.image_url && (
+                        <img
+                          src={a.image_url}
+                          alt={a.title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      )}
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-black/20 transition" />
+                      <span className="absolute top-4 left-4 chip bg-white/90 !text-primary">
+                        {a.description || "Œuvre d'art"}
+                      </span>
+                      <span
+                        className={`absolute top-4 right-4 chip ${
+                          a.status === "sold"
+                            ? "bg-white/90 !text-success"
+                            : "bg-white/90 !text-primary"
+                        }`}
+                      >
+                        {a.status === "sold"
+                          ? "Vendu"
+                          : a.price != null
+                            ? formatChf(a.price)
+                            : "Négociation"}
+                      </span>
                     </div>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary" aria-hidden="true">
-                      <path d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
+                    <div className="p-5 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-ink text-18 font-bold">{a.title}</h3>
+                        <p className="text-muted text-14">par {a.artist}</p>
+                      </div>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary" aria-hidden="true">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+                </Reveal>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

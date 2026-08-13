@@ -15,12 +15,13 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-function formatChf(value: number | null): string {
-  if (value == null) return "—";
-  return new Intl.NumberFormat("fr-CH", {
-    style: "currency",
-    currency: "CHF",
-  }).format(Number(value));
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 serve(async (req) => {
@@ -35,7 +36,7 @@ serve(async (req) => {
   const smtpUser = Deno.env.get("SMTP_USER");
   const smtpPassword = Deno.env.get("SMTP_PASSWORD");
   const smtpFrom = Deno.env.get("SMTP_FROM") ?? smtpUser;
-  const siteUrl = (Deno.env.get("SITE_URL") ?? "https://boursemarket.business").replace(/\/+$/, "");
+  const siteUrl = (Deno.env.get("SITE_URL") ?? "https://bourse-art.vercel.app").replace(/\/+$/, "");
 
   if (!supabaseUrl || !serviceRoleKey || !anonKey || !smtpUser || !smtpPassword) {
     return json({ ok: false, error: "Configuration du serveur incomplète (clés SMTP manquantes)." }, 500);
@@ -46,9 +47,9 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => null);
-    const artworkId = body?.artworkId;
-    if (!artworkId) {
-      return json({ ok: false, error: "Paramètre artworkId requis." }, 400);
+    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (!email) {
+      return json({ ok: false, error: "Paramètre email requis." }, 400);
     }
 
     const authHeader = req.headers.get("Authorization");
@@ -74,27 +75,30 @@ serve(async (req) => {
       return json({ ok: false, error: "Accès refusé : réservé à l'administrateur." }, 403);
     }
 
-    const { data: artwork, error: artError } = await adminClient
-      .from("artworks")
-      .select("title, price, buyer_name, negotiation_date, artists:users(name, email)")
-      .eq("id", artworkId)
+    const { data: pending } = await adminClient
+      .from("pending_users")
+      .select("name, email")
+      .ilike("email", email)
       .maybeSingle();
-    if (artError || !artwork) {
-      return json({ ok: false, error: "Tableau introuvable." }, 404);
+    const artistName = pending?.name ?? "Artiste";
+
+    const redirectTo = `${siteUrl}/connexion?activation=1`;
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+      options: { redirectTo },
+    });
+    const magicLink = linkData?.properties?.action_link;
+    if (linkError || !magicLink) {
+      return json(
+        { ok: false, error: `Impossible de générer le lien de connexion : ${linkError?.message ?? "erreur inconnue"}` },
+        500
+      );
     }
 
-    const artistEmail = artwork.artists?.email;
-    const artistName = artwork.artists?.name ?? "Artiste";
-    if (!artistEmail) {
-      return json({ ok: false, error: "Adresse email de l'artiste introuvable." }, 404);
-    }
-
-    const buyerName = artwork.buyer_name ?? "Un acheteur";
-    const saleDate = artwork.negotiation_date
-      ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(
-          new Date(artwork.negotiation_date)
-        )
-      : "récemment";
+    const nameHtml = escapeHtml(artistName);
+    const emailHtml = escapeHtml(email);
+    const magicLinkHtml = escapeHtml(magicLink);
 
     const client = new SMTPClient({
       connection: {
@@ -111,32 +115,47 @@ serve(async (req) => {
     try {
       await client.send({
         from: smtpFrom ?? smtpUser,
-        to: [artistEmail],
-        subject: `Votre tableau « ${artwork.title} » a été vendu`,
+        to: [email],
+        subject: "Bienvenue sur Bourse&Art",
         content: `Bonjour ${artistName},
-Votre tableau « ${artwork.title} » a été vendu à ${buyerName} le ${saleDate} au prix de ${formatChf(artwork.price)}.
-Le montant a été crédité sur votre solde. Vous pouvez suivre vos ventes depuis votre espace artiste.
+
+Bienvenue sur Bourse&Art !
+
+Votre compte a été créé par l'administrateur pour exposer vos œuvres d'art sur notre plateforme boursière.
+
+Pour activer votre espace artiste, cliquez sur le lien ci-dessous puis choisissez votre mot de passe :
+
+${magicLink}
+
+Ce lien est valable 24 heures. Une fois activé, vous pourrez vous connecter avec votre adresse email (${email}) et suivre la cotation de vos œuvres, vos ventes et vos retraits.
 
 L'équipe Bourse&Art`,
         html: `
           <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#132853;">
-            <h1 style="font-size:22px;margin:0 0 16px;">Félicitations !</h1>
+            <h1 style="font-size:22px;margin:0 0 16px;">Bienvenue sur Bourse&Art !</h1>
             <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">
-              Bonjour ${artistName}, votre tableau <strong>« ${artwork.title} »</strong>
-              a été vendu à ${buyerName} le ${saleDate} au prix de
-              <strong>${formatChf(artwork.price)}</strong>.
+              Bonjour <strong>${nameHtml}</strong>,
             </p>
             <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">
-              Le montant a été crédité sur votre solde. Vous pouvez suivre vos ventes
-              et vos retraits depuis votre espace artiste.
+              Votre compte a été créé par l'administrateur pour exposer vos
+              <strong>œuvres d'art</strong> sur notre plateforme boursière.
             </p>
-            <a href="${siteUrl}/artiste"
+            <p style="font-size:16px;line-height:1.6;margin:0 0 20px;">
+              Pour activer votre espace artiste, cliquez sur le bouton ci-dessous
+              puis choisissez votre mot de passe :
+            </p>
+            <a href="${magicLinkHtml}"
                style="display:inline-block;background:#C9A84C;color:#ffffff;text-decoration:none;
-                      padding:12px 20px;border-radius:8px;font-size:15px;">
-              Accéder à mon espace
+                      padding:14px 24px;border-radius:8px;font-size:16px;font-weight:bold;">
+              Activer mon espace artiste
             </a>
+            <p style="font-size:13px;color:#6b6b70;margin:20px 0 0;line-height:1.5;">
+              Ce lien est valable 24 heures. Une fois activé, connectez-vous avec
+              <strong>${emailHtml}</strong> pour suivre la cotation de vos œuvres,
+              vos ventes et vos retraits.
+            </p>
             <p style="font-size:13px;color:#6b6b70;margin:24px 0 0;">
-              L'équipe Bourse&Art — Cette notification est automatique, merci de ne pas y répondre.
+              L'équipe Bourse&Art — Cet email est automatique, merci de ne pas y répondre.
             </p>
           </div>
         `,
@@ -149,8 +168,11 @@ L'équipe Bourse&Art`,
       }
     }
 
-    return json({ ok: true, to: artistEmail });
+    return json({ ok: true, to: email });
   } catch (err) {
-    return json({ ok: false, error: `Échec de l'envoi du mail : ${err instanceof Error ? err.message : "erreur inconnue"}` }, 500);
+    return json(
+      { ok: false, error: `Échec de l'envoi du mail : ${err instanceof Error ? err.message : "erreur inconnue"}` },
+      500
+    );
   }
 });

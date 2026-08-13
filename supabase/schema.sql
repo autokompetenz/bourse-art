@@ -264,6 +264,19 @@ declare
 begin
   select id into v_exists from auth.users where lower(email) = lower(p_email) limit 1;
   if v_exists is not null then
+    -- Compte déjà existant (seed rejoué, ou compte créé par l'admin) :
+    -- on remet à jour mot de passe et profil pour garantir le seed de démo.
+    -- admin_create_artist refuse les emails déjà utilisés, cette branche n'est
+    -- donc atteinte que par le seed.
+    update auth.users
+    set encrypted_password = crypt(p_password, gen_salt('bf')),
+        raw_app_meta_data = jsonb_build_object('provider', 'email', 'providers', array['email'], 'role', p_role),
+        raw_user_meta_data = jsonb_build_object('name', p_name),
+        updated_at = now()
+    where id = v_exists;
+    update public.users
+    set name = p_name, role = p_role
+    where id = v_exists;
     return v_exists;
   end if;
   insert into auth.users (
@@ -517,5 +530,11 @@ from public.users u
 where u.email = 'artiste@demo.com'
   and not exists (select 1 from public.artworks);
 
-insert into public.orders (client_name, client_email, description, budget) values
-  ('Jean Dupont', 'jean@example.com', 'Un portrait abstrait bleu et or, format 50x70.', '500 CHF');
+insert into public.orders (client_name, client_email, description, budget)
+select 'Jean Dupont', 'jean@example.com', 'Un portrait abstrait bleu et or, format 50x70.', '500 CHF'
+where not exists (
+  select 1 from public.orders
+  where client_name = 'Jean Dupont'
+    and client_email = 'jean@example.com'
+    and description = 'Un portrait abstrait bleu et or, format 50x70.'
+);

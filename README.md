@@ -50,7 +50,8 @@ Variables d'environnement à configurer sur Vercel (Project Settings → Environ
 | `SMTP_USER` | `info@boursemarket.business` |
 | `SMTP_PASSWORD` | mot de passe de la boîte mail |
 | `SMTP_FROM` | `Bourse&Art <info@boursemarket.business>` |
-| `SITE_URL` | `https://boursemarket.business` |
+| `SITE_URL` | `https://www.boursemarket.business` |
+| `VITE_SITE_URL` | `https://www.boursemarket.business` (compile dans le front : le repli Supabase Magic Link ne pointe alors jamais vers localhost) |
 
 > En local, le `.env` ne contient que les clés publiques `VITE_*` ; les identifiants SMTP et la clé service_role ne doivent **jamais** être embarqués dans le JS du navigateur.
 

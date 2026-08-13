@@ -219,7 +219,7 @@ export async function sendActivationLink(
 async function sendViaSupabaseMagicLink(
   email: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const redirectTo = `${window.location.origin}/connexion?activation=1`;
+  const redirectTo = `${appOrigin()}/connexion?activation=1`;
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
@@ -234,6 +234,19 @@ async function sendViaSupabaseMagicLink(
     };
   }
   return { ok: true };
+}
+
+/**
+ * Origine publique du site pour les liens d'activation.
+ * En production (VITE_SITE_URL renseigné), le lien n'est jamais localhost,
+ * même dans le repli Supabase Magic Link.
+ */
+function appOrigin(): string {
+  const configured = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim();
+  if (configured && !/localhost|127\.0\.0\.1|:\d+$/.test(configured)) {
+    return configured.replace(/\/+$/, "");
+  }
+  return window.location.origin;
 }
 
 /** Définit le mot de passe du client connecté (après magic link). */

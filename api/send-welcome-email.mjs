@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   const smtpUser = process.env.SMTP_USER;
   const smtpPassword = process.env.SMTP_PASSWORD;
   const smtpFrom = process.env.SMTP_FROM ?? smtpUser;
-  const siteUrl = (process.env.SITE_URL ?? "https://boursemarket.business").replace(/\/+$/, "");
+  const siteUrl = (process.env.SITE_URL ?? "https://www.boursemarket.business").replace(/\/+$/, "");
 
   if (!supabaseUrl || !serviceRoleKey || !smtpUser || !smtpPassword) {
     return res
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: "magiclink",
       email,
-      options: { redirectTo },
+      options: { redirectTo, shouldSendEmail: false },
     });
     const magicLink = linkData?.properties?.action_link;
     if (linkError || !magicLink) {

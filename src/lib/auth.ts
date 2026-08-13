@@ -132,7 +132,7 @@ export function getDemoUsers(): Profile[] {
     .map(({ password: _ignored, ...user }) => user);
 }
 
-export function demoCreateArtist(name: string, email: string): boolean {
+export function demoCreateArtist(name: string, email: string, password: string): boolean {
   if (isConfigured()) return false;
   const users = readDemoUsers();
   const emailNormalized = email.trim().toLowerCase();
@@ -141,7 +141,7 @@ export function demoCreateArtist(name: string, email: string): boolean {
     id: `demo-${Date.now()}`,
     name: name.trim(),
     email: emailNormalized,
-    password: null,
+    password,
     role: "artist",
   };
   localStorage.setItem(DEMO_USERS_KEY, JSON.stringify([...users, newUser]));
@@ -238,6 +238,7 @@ export type DemoArtistAccount = {
   pending: boolean;
   created_at: string;
   artworks_count: number;
+  password?: string | null;
 };
 
 export function getDemoArtists(): DemoArtistAccount[] {
@@ -251,5 +252,6 @@ export function getDemoArtists(): DemoArtistAccount[] {
       pending: !u.password,
       created_at: "",
       artworks_count: 0,
+      password: u.password,
     }));
 }

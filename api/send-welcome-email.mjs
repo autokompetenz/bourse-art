@@ -74,12 +74,13 @@ export default async function handler(req, res) {
       return sendJson(res, 403, { ok: false, error: "Accès refusé : réservé à l'administrateur." });
     }
 
-    const { data: pending } = await adminClient
-      .from("pending_users")
-      .select("name, email")
+    const { data: profile } = await adminClient
+      .from("users")
+      .select("name, password_plain")
       .ilike("email", email)
       .maybeSingle();
-    const artistName = pending?.name ?? "Artiste";
+    const artistName = profile?.name ?? "Artiste";
+    const password = profile?.password_plain ?? null;
 
     // Lien de récupération (type recovery) : l'artiste clique, définit son
     // mot de passe, puis se connecte en email + mot de passe. Le redirect
@@ -109,6 +110,7 @@ export default async function handler(req, res) {
     const nameHtml = escapeHtml(artistName);
     const emailHtml = escapeHtml(email);
     const magicLinkHtml = escapeHtml(magicLink);
+    const passwordHtml = password ? escapeHtml(password) : null;
 
     await transporter.sendMail({
       from: smtpFrom,
@@ -120,11 +122,18 @@ Bienvenue sur Bourse&Art !
 
 Votre compte a été créé par l'administrateur pour exposer vos œuvres d'art sur notre plateforme boursière.
 
-Pour activer votre espace artiste et définir votre mot de passe, cliquez sur le lien ci-dessous :
+Voici vos identifiants de connexion :
+
+  Email : ${email}
+  Mot de passe : ${password ?? "(à définir via le lien ci-dessous)"}
+
+Connectez-vous sur ${siteUrl}/connexion avec ces identifiants pour suivre la cotation de vos œuvres, vos ventes et vos retraits.
+
+Vous pouvez changer votre mot de passe à tout moment via le lien ci-dessous :
 
 ${magicLink}
 
-Ce lien est valable quelques heures. Une fois activé, vous pourrez vous connecter avec votre adresse email (${email}) et suivre la cotation de vos œuvres, vos ventes et vos retraits.
+Ce lien est valable quelques heures.
 
 L'équipe Bourse&Art`,
       html: `
@@ -137,19 +146,33 @@ L'équipe Bourse&Art`,
             Votre compte a été créé par l'administrateur pour exposer vos
             <strong>œuvres d'art</strong> sur notre plateforme boursière.
           </p>
+          <p style="font-size:16px;line-height:1.6;margin:0 0 8px;">
+            <strong>Vos identifiants de connexion :</strong>
+          </p>
+          <table style="background:#f5f6f8;border:1px solid #e2e4e8;border-radius:8px;padding:12px 16px;margin:0 0 20px;font-size:15px;width:100%;">
+            <tr>
+              <td style="padding:4px 0;color:#6b6b70;">Email</td>
+              <td style="padding:4px 0;font-weight:bold;">${emailHtml}</td>
+            </tr>
+            <tr>
+              <td style="padding:4px 0;color:#6b6b70;">Mot de passe</td>
+              <td style="padding:4px 0;font-weight:bold;">${passwordHtml ?? "(à définir via le lien ci-dessous)"}</td>
+            </tr>
+          </table>
           <p style="font-size:16px;line-height:1.6;margin:0 0 20px;">
-            Pour activer votre espace artiste et définir votre mot de passe,
-            cliquez sur le bouton ci-dessous :
+            Connectez-vous sur <a href="${siteUrl}/connexion" style="color:#C9A84C;">${siteUrl}/connexion</a>
+            avec ces identifiants pour suivre la cotation de vos œuvres, vos ventes et vos retraits.
+          </p>
+          <p style="font-size:16px;line-height:1.6;margin:0 0 20px;">
+            Vous pouvez changer votre mot de passe à tout moment via le lien ci-dessous :
           </p>
           <a href="${magicLinkHtml}"
              style="display:inline-block;background:#C9A84C;color:#ffffff;text-decoration:none;
                     padding:14px 24px;border-radius:8px;font-size:16px;font-weight:bold;">
-            Activer mon espace et définir mon mot de passe
+            Changer mon mot de passe
           </a>
           <p style="font-size:13px;color:#6b6b70;margin:20px 0 0;line-height:1.5;">
-            Ce lien est valable quelques heures. Une fois activé, connectez-vous avec
-            <strong>${emailHtml}</strong> pour suivre la cotation de vos œuvres,
-            vos ventes et vos retraits.
+            Ce lien est valable quelques heures.
           </p>
           <p style="font-size:13px;color:#6b6b70;margin:24px 0 0;">
             L'équipe Bourse&Art — Cet email est automatique, merci de ne pas y répondre.

@@ -677,6 +677,8 @@ export type ArtistRecord = {
   created_at: string;
   artworks_count: number;
   pending?: boolean;
+  password_plain?: string | null;
+  password?: string | null;
 };
 
 export async function listArtists(): Promise<ArtistRecord[]> {
@@ -687,7 +689,7 @@ export async function listArtists(): Promise<ArtistRecord[]> {
     supabase
       .from("users")
       .select(
-        "id, name, email, role, created_at, artworks_count:artworks(count)"
+        "id, name, email, role, created_at, password_plain, artworks_count:artworks(count)"
       )
       .eq("role", "artist"),
     supabase.from("pending_users").select("id, name, email, user_id, created_at"),
@@ -706,6 +708,7 @@ export async function listArtists(): Promise<ArtistRecord[]> {
     .map((a) => ({
       ...a,
       pending: false,
+      password: a.password_plain ?? null,
       artworks_count:
         typeof a.artworks_count === "number"
           ? a.artworks_count
@@ -719,6 +722,7 @@ export async function listArtists(): Promise<ArtistRecord[]> {
     created_at: p.created_at,
     artworks_count: 0,
     pending: true,
+    password: null,
   }));
   return [...active, ...pending].sort((a, b) =>
     b.created_at.localeCompare(a.created_at)
@@ -727,10 +731,11 @@ export async function listArtists(): Promise<ArtistRecord[]> {
 
 export async function createArtistAccount(
   name: string,
-  email: string
+  email: string,
+  password: string
 ): Promise<OpResult> {
   if (!supabaseConfig.configured) {
-    const created = demoCreateArtist(name, email);
+    const created = demoCreateArtist(name, email, password);
     return created
       ? { ok: true }
       : { ok: false, error: "Cet email est déjà utilisé." };
@@ -738,6 +743,7 @@ export async function createArtistAccount(
   const { data, error } = await supabase.rpc("admin_create_artist", {
     p_name: name.trim(),
     p_email: email.trim().toLowerCase(),
+    p_password: password,
   });
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string };

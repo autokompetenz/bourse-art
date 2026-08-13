@@ -10,6 +10,10 @@ create table if not exists public.users (
 -- Migration : l'ancien hash client n'est plus utilisé
 alter table public.users drop column if exists password_hash;
 
+-- Copie lisible du mot de passe défini par l'admin à la création du compte
+-- (affichée dans l'espace admin). Effacée si l'artiste change son mot de passe.
+alter table public.users add column if not exists password_plain text;
+
 -- Œuvres des artistes
 create table if not exists public.artworks (
   id uuid primary key default gen_random_uuid(),
@@ -322,21 +326,20 @@ create policy pending_users_delete_admin on public.pending_users
   for delete using (public.is_admin());
 
 -- ------------------------------------------------------------
--- RPC : l'admin crée un compte artiste (nom + email uniquement).
--- Un utilisateur Supabase Auth est créé avec un mot de passe temporaire
--- (jamais communiqué) ; le client reçoit un lien de récupération (recovery)
--- dans le mail de bienvenue pour définir lui-même son mot de passe.
+-- RPC : l'admin crée un compte artiste (nom, email et mot de passe).
+-- L'utilisateur Supabase Auth est créé avec ce mot de passe ; il est aussi
+-- enregistré en clair dans users.password_plain pour être affiché dans
+-- l'espace admin et communiqué à l'artiste. Le compte est actif
+-- immédiatement (plus de file d'attente d'activation).
 -- ------------------------------------------------------------
--- Supprime l'ancienne signature (nom, email, mot de passe) utilisée avant
--- le passage au lien recovery : seule la version (nom, email) est conservée.
+drop function if exists public.admin_create_artist(text, text);
 drop function if exists public.admin_create_artist(text, text, text);
-create or replace function public.admin_create_artist(p_name text, p_email text)
+create or replace function public.admin_create_artist(p_name text, p_email text, p_password text)
 returns json
 language plpgsql security definer set search_path = public, extensions
 as $$
 declare
   v_uid uuid;
-  v_tmp text := 'tmp-' || encode(gen_random_bytes(12), 'hex');
 begin
   if not public.is_admin() then
     return json_build_object('ok', false, 'error', 'Accès refusé.');
@@ -347,37 +350,36 @@ begin
   if p_email is null or position('@' in btrim(p_email)) = 0 then
     return json_build_object('ok', false, 'error', 'Email invalide.');
   end if;
+  if p_password is null or length(p_password) < 6 then
+    return json_build_object('ok', false, 'error', 'Le mot de passe doit contenir au moins 6 caractères.');
+  end if;
   if exists (select 1 from public.pending_users where lower(email) = lower(btrim(p_email)))
      or exists (select 1 from auth.users where lower(email) = lower(btrim(p_email))) then
     return json_build_object('ok', false, 'error', 'Cet email est déjà utilisé.');
   end if;
-  v_uid := public.create_auth_user(btrim(p_name), lower(btrim(p_email)), v_tmp, 'artist');
-  insert into public.pending_users (user_id, name, email)
-  values (v_uid, btrim(p_name), lower(btrim(p_email)));
+  v_uid := public.create_auth_user(btrim(p_name), lower(btrim(p_email)), p_password, 'artist');
+  update public.users set password_plain = p_password where id = v_uid;
   return json_build_object('ok', true, 'id', v_uid);
 end;
 $$;
 
-grant execute on function public.admin_create_artist(text, text) to authenticated;
+grant execute on function public.admin_create_artist(text, text, text) to authenticated;
 
 -- ------------------------------------------------------------
--- RPC : fin d'activation. Le client (déjà connecté via le lien recovery)
--- a défini son mot de passe côté Supabase Auth (auth.updateUser).
--- Cette fonction retire simplement le compte de la liste d'attente.
+-- RPC : fin d'activation. L'artiste a éventuellement défini son propre
+-- mot de passe via le lien recovery : on retire le compte de la liste
+-- d'attente (idempotent) et on efface la copie lisible admin devenue
+-- obsolète. Sans lien recovery, le compte est déjà actif (mot de passe
+-- fourni par l'admin) et cette fonction ne fait rien.
 -- ------------------------------------------------------------
 drop function if exists public.activate_artist(text, text);
 create or replace function public.activate_artist()
 returns json
 language plpgsql security definer set search_path = public
 as $$
-declare
-  v_pending record;
 begin
-  select * into v_pending from public.pending_users where user_id = auth.uid();
-  if not found then
-    return json_build_object('ok', false, 'error', 'Aucun compte en attente pour cet utilisateur.');
-  end if;
-  delete from public.pending_users where id = v_pending.id;
+  delete from public.pending_users where user_id = auth.uid();
+  update public.users set password_plain = null where id = auth.uid();
   return json_build_object('ok', true);
 end;
 $$;
@@ -512,6 +514,9 @@ on conflict (id) do nothing;
 insert into public.users (id, name, email, role)
 select id, 'Artiste Démo', email, 'artist' from auth.users where email = 'artiste@demo.com'
 on conflict (id) do nothing;
+
+-- Mot de passe du compte artiste de démonstration (visible par l'admin)
+update public.users set password_plain = 'artist123' where email = 'artiste@demo.com';
 
 insert into public.settings (id, iban) values
   (1, 'FR76 3000 6000 0112 3456 7890 189')

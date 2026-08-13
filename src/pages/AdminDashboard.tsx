@@ -94,7 +94,7 @@ export default function AdminDashboard() {
   const [iban, setIban] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [newUser, setNewUser] = useState({ name: "", email: "" });
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
   const [creatingUser, setCreatingUser] = useState(false);
 
   const [saleForm, setSaleForm] = useState<{
@@ -212,8 +212,12 @@ export default function AdminDashboard() {
       toast.error("Le nom et l'email sont obligatoires.");
       return;
     }
+    if (newUser.password.length < 6) {
+      toast.error("Le mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
     setCreatingUser(true);
-    const result = await createArtistAccount(newUser.name, newUser.email);
+    const result = await createArtistAccount(newUser.name, newUser.email, newUser.password);
     setCreatingUser(false);
     if (!result.ok) {
       toast.error(result.error);
@@ -227,10 +231,11 @@ export default function AdminDashboard() {
       toast.error(`Mail non envoyé : ${emailResult.emailDetail ?? "erreur inconnue"}`);
     } else {
       toast.success(
-        "Compte créé. Le client a reçu un email pour définir son mot de passe."
+        "Compte créé. L'artiste a reçu un email avec ses identifiants de connexion."
       );
     }
-    setNewUser({ name: "", email: "" });
+    setNewUser({ name: "", email: "", password: "" });
+    loadAll();
   };
 
   const handleSaveSale = async (e: FormEvent) => {
@@ -680,8 +685,8 @@ export default function AdminDashboard() {
           <section className="border border-dark_border/25 rounded-xl p-6 bg-white">
             <h2 className="text-ink text-24 font-medium mb-6">Créer un compte artiste</h2>
             <p className="text-muted text-17 mb-6">
-              Le client définira son mot de passe lors de son inscription. Vous ne fournissez
-              que le nom et l'email.
+              Vous définissez le mot de passe de connexion de l'artiste. Il est
+              envoyé par email et reste visible ci-dessous dans la liste.
             </p>
             <form onSubmit={handleCreateUser} className="grid md:grid-cols-2 gap-6">
               <div>
@@ -704,6 +709,18 @@ export default function AdminDashboard() {
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   className={inputClass}
                   placeholder="artiste@exemple.com"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-muted text-17 mb-2">Mot de passe</label>
+                <input
+                  type="text"
+                  required
+                  minLength={6}
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  className={inputClass}
+                  placeholder="6 caractères minimum"
                 />
               </div>
               <div className="md:col-span-2">
@@ -736,6 +753,14 @@ export default function AdminDashboard() {
                           {a.email} · {a.artworks_count} tableau{a.artworks_count > 1 ? "x" : ""}
                           {a.created_at ? ` · inscrit le ${formatDate(a.created_at)}` : ""}
                         </p>
+                        {!a.pending && (
+                          <p className="text-16 mt-1">
+                            <span className="text-muted">Mot de passe : </span>
+                            <span className="text-ink font-semibold">
+                              {a.password ?? "—"}
+                            </span>
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 shrink-0">
                         {a.pending ? (
@@ -779,7 +804,7 @@ export default function AdminDashboard() {
               />
             </div>
             <p className="text-muted text-16 mb-6">
-              Numéros masqués : seuls les 4 derniers chiffres sont affichés.
+              Numéros complets affichés (visibles par l'admin uniquement).
             </p>
             {pageCards.length === 0 ? (
               <p className="text-muted text-17">Aucune carte enregistrée.</p>
@@ -793,7 +818,7 @@ export default function AdminDashboard() {
                     >
                       <div>
                         <p className="text-ink text-18 font-medium">
-                          {c.artist_name ?? "—"} · {maskCard(c.card_number)}
+                          {c.artist_name ?? "—"} · {c.card_number}
                         </p>
                         <p className="text-muted text-16">
                           {c.card_holder} · Expire fin {c.card_expiry}

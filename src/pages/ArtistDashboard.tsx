@@ -278,6 +278,66 @@ export default function ArtistDashboard() {
           </div>
         </div>
 
+        <section className="border border-dark_border/25 rounded-xl p-6 bg-white mb-16">
+          <h2 className="text-ink text-24 font-medium mb-6">
+            Mes œuvres ({artworks.length})
+          </h2>
+          {artworks.length === 0 ? (
+            <p className="text-muted text-17">Vous n'avez pas encore ajouté d'œuvre.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {artworks.map((art) => (
+                <div
+                  key={art.id}
+                  className="border border-dark_border border-opacity-20 rounded-xl overflow-hidden bg-white"
+                >
+                  <div className="aspect-[4/3] bg-dark_grey">
+                    {art.image_url ? (
+                      <img
+                        src={art.image_url}
+                        alt={art.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted text-15">
+                        Aucune image
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <h4 className="text-ink text-17 font-medium truncate">{art.title}</h4>
+                    <div className="flex items-center justify-between gap-2 mt-2">
+                      <span
+                        className={
+                          art.status === "sold"
+                            ? "chip !text-success !border-success/40"
+                            : "chip !text-warning !border-warning/40"
+                        }
+                      >
+                        {art.status === "sold" ? "Vendu" : "En négociation"}
+                      </span>
+                      {art.status === "sold" && art.price != null && (
+                        <span className="text-success text-16 font-bold">
+                          {formatChf(art.price)}
+                        </span>
+                      )}
+                    </div>
+                    {art.status !== "sold" && (
+                      <button
+                        onClick={() => handleDeleteArtwork(art.id, art.title)}
+                        disabled={deletingId === art.id}
+                        className="text-error text-15 hover:underline mt-2 disabled:opacity-50"
+                      >
+                        {deletingId === art.id ? "Suppression..." : "Supprimer"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         <div className="grid lg:grid-cols-2 gap-10 mb-16">
           <section className="border border-dark_border/25 rounded-xl p-6 bg-white">
             <h2 className="text-ink text-24 font-medium mb-6">
@@ -290,15 +350,22 @@ export default function ArtistDashboard() {
                 {sold.map((art) => (
                   <li
                     key={art.id}
-                    className="border border-dark_border border-opacity-20 rounded-lg p-4 flex flex-wrap justify-between items-center gap-3"
+                    className="border border-dark_border border-opacity-20 rounded-lg p-4 flex items-center gap-4"
                   >
-                    <div>
+                    {art.image_url && (
+                      <img
+                        src={art.image_url}
+                        alt={art.title}
+                        className="w-20 h-20 rounded-lg object-cover border border-dark_border/30 shrink-0"
+                      />
+                    )}
+                    <div className="min-w-0">
                       <h4 className="text-ink text-18 font-medium">{art.title}</h4>
                       <p className="text-muted text-16">
                         Acheteur : {art.buyer_name ?? "—"} · Date : {formatDate(art.negotiation_date)}
                       </p>
                     </div>
-                    <span className="text-success text-18 font-bold">
+                    <span className="text-success text-18 font-bold ml-auto shrink-0">
                       {art.price != null ? formatChf(art.price) : "—"}
                     </span>
                   </li>
@@ -318,13 +385,20 @@ export default function ArtistDashboard() {
                 {inNegotiation.map((art) => (
                   <li
                     key={art.id}
-                    className="border border-dark_border border-opacity-20 rounded-lg p-4 flex justify-between items-center gap-3"
+                    className="border border-dark_border border-opacity-20 rounded-lg p-4 flex items-center gap-4"
                   >
-                    <div>
+                    {art.image_url && (
+                      <img
+                        src={art.image_url}
+                        alt={art.title}
+                        className="w-20 h-20 rounded-lg object-cover border border-dark_border/30 shrink-0"
+                      />
+                    )}
+                    <div className="min-w-0">
                       <h4 className="text-ink text-18 font-medium">{art.title}</h4>
                       <p className="text-muted text-16">{art.description}</p>
                     </div>
-                    <div className="flex items-center gap-4 shrink-0">
+                    <div className="flex items-center gap-4 shrink-0 ml-auto">
                       <span className="text-warning text-18 font-medium">En cours</span>
                       <button
                         onClick={() => handleDeleteArtwork(art.id, art.title)}

@@ -285,7 +285,7 @@ export default function ArtistDashboard() {
           {artworks.length === 0 ? (
             <p className="text-muted text-17">Vous n'avez pas encore ajouté d'œuvre.</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {artworks.map((art) => (
                 <div
                   key={art.id}
@@ -306,7 +306,7 @@ export default function ArtistDashboard() {
                   </div>
                   <div className="p-3">
                     <h4 className="text-ink text-17 font-medium truncate">{art.title}</h4>
-                    <div className="flex items-center justify-between gap-2 mt-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
                       <span
                         className={
                           art.status === "sold"
@@ -326,7 +326,7 @@ export default function ArtistDashboard() {
                       <button
                         onClick={() => handleDeleteArtwork(art.id, art.title)}
                         disabled={deletingId === art.id}
-                        className="text-error text-15 hover:underline mt-2 disabled:opacity-50"
+                        className="text-error text-15 hover:underline mt-2 py-1 disabled:opacity-50"
                       >
                         {deletingId === art.id ? "Suppression..." : "Supprimer"}
                       </button>

@@ -7,8 +7,10 @@ export type EmailResult = {
 
 /**
  * Notifie par email l'artiste dont le tableau vient d'être vendu.
- * Côté Supabase, l'envoi passe par l'Edge Function `notify-artist-sale`
- * (Resend). En mode démo (Supabase non configuré), aucun email réel n'est envoyé.
+ * L'envoi passe par la fonction serverless Vercel
+ * `/api/send-sale-notification` (SMTP, même infrastructure que le mail de
+ * bienvenue). En mode démo (Supabase non configuré), aucun email réel n'est
+ * envoyé.
  */
 export async function notifyArtistOfSale(artworkId: string): Promise<EmailResult> {
   if (!supabaseConfig.configured) {
@@ -18,17 +20,32 @@ export async function notifyArtistOfSale(artworkId: string): Promise<EmailResult
     };
   }
   try {
-    const { error } = await supabase.functions.invoke("notify-artist-sale", {
-      body: { artworkId },
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+    const res = await fetch("/api/send-sale-notification", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ artworkId }),
     });
-    if (error) {
-      return { status: "error", detail: error.message };
+    const payload = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      error?: string;
+    } | null;
+    if (res.ok && payload?.ok) {
+      return { status: "sent" };
     }
-    return { status: "sent" };
+    const apiError = payload?.error ?? `Erreur serveur (${res.status})`;
+    return {
+      status: "error",
+      detail: `L'email de notification n'a pas pu être envoyé : ${apiError}. Vérifiez que vous testez sur le site en ligne (l'API d'envoi n'existe qu'en production).`,
+    };
   } catch (err) {
     return {
       status: "error",
-      detail: err instanceof Error ? err.message : "Erreur inattendue.",
+      detail: `L'email de notification n'a pas pu être envoyé : ${err instanceof Error ? err.message : "erreur inconnue"}. Vérifiez que vous testez sur le site en ligne.`,
     };
   }
 }

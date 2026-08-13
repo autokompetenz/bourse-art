@@ -35,7 +35,7 @@ npm run dev
 ### Emails
 
 - **Bienvenue / invitation** : à la création d'un compte par l'admin, le mail d'accueil personnalisé est envoyé par la **fonction serverless Vercel** `/api/send-welcome-email` via le SMTP de la plateforme (Hostinger). Il contient un lien de récupération (définition du mot de passe) qui pointe vers `SITE_URL` (jamais localhost). Aucun mail générique de Supabase n'est envoyé ; en cas d'échec de l'API, une erreur claire est affichée à l'admin (l'API n'existe qu'en production).
-- **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification via l'Edge Function `notify-artist-sale`.
+- **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification via la **fonction serverless Vercel** `/api/send-sale-notification` (même infrastructure SMTP que le mail de bienvenue).
 
 Variables d'environnement à configurer sur Vercel (Project Settings → Environment Variables) :
 
@@ -52,13 +52,6 @@ Variables d'environnement à configurer sur Vercel (Project Settings → Environ
 | `SITE_URL` | `https://www.boursemarket.business` (origine du lien de récupération du mot de passe dans le mail de bienvenue) |
 
 > En local, le `.env` ne contient que les clés publiques `VITE_*` ; les identifiants SMTP et la clé service_role ne doivent **jamais** être embarqués dans le JS du navigateur.
-
-Déployer l'Edge Function de vente et ses secrets :
-
-```
-supabase functions deploy notify-artist-sale
-supabase secrets set SMTP_HOST=smtp.hostinger.com SMTP_PORT=465 SMTP_USER=info@boursemarket.business SMTP_PASSWORD=... SMTP_FROM="Bourse&Art <info@boursemarket.business>" SITE_URL=https://boursemarket.business
-```
 
 ### Authentification
 
@@ -78,7 +71,7 @@ L'authentification passe par **Supabase Auth** (JWT), plus aucun hash côté cli
 1. Poussez le projet sur GitHub et importez-le dans Vercel.
 2. Ajoutez les variables d'environnement (voir « Emails ») : `VITE_*`, `SUPABASE_SERVICE_ROLE_KEY`, `SMTP_*`, `SITE_URL`.
 3. Framework : Vite. Build : `npm run build`. Output : `dist`.
-4. La fonction serverless `/api/send-welcome-email` est déployée automatiquement par Vercel (aucune configuration).
+4. Les fonctions serverless `/api/send-welcome-email` et `/api/send-sale-notification` sont déployées automatiquement par Vercel (aucune configuration).
 5. Les routes SPA (`/admin`, `/artiste`, `/commandes`, `/connexion`) sont gérées par le `vercel.json` inclus.
 
 ## Comptes de démonstration

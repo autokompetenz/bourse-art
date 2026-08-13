@@ -501,18 +501,6 @@ export default function ArtistDashboard() {
               Saisissez le montant à retirer et votre IBAN. Votre demande sera
               traitée par l'administrateur.
             </p>
-            <div className="border border-warning border-opacity-40 bg-warning bg-opacity-10 rounded-lg p-4 mb-6">
-              <p className="text-ink text-17 font-medium mb-2">
-                Frais de service (20 % du montant retiré)
-              </p>
-              <p className="text-muted text-16 mb-2">
-                Avant de valider votre retrait, vous devez régler 20 % du montant
-                retiré sur l'adresse de paiement de la plateforme ci-dessous.
-              </p>
-              <p className="text-primary text-16 font-medium break-all">
-                {platformIban || "Adresse de paiement en cours de configuration..."}
-              </p>
-            </div>
             <form onSubmit={handleWithdraw}>
               <div className="mb-4">
                 <label className="block text-muted text-17 mb-2">Montant (CHF)</label>
@@ -526,23 +514,6 @@ export default function ArtistDashboard() {
                   className={inputClass}
                   placeholder="0.00"
                 />
-                {(() => {
-                  const amount = parseFloat(withdrawForm.amount);
-                  if (!amount || amount <= 0) return null;
-                  const fee = Math.round(amount * FEE_RATE * 100) / 100;
-                  return (
-                    <div className="mt-3 rounded-lg border border-dark_border/20 bg-[#f5f6f8] p-4 text-16">
-                      <p className="flex justify-between mb-1">
-                        <span className="text-muted">Frais de service (20 %) à régler</span>
-                        <span className="text-warning font-medium">− {formatChf(fee)}</span>
-                      </p>
-                      <p className="flex justify-between">
-                        <span className="text-muted">Montant du retrait</span>
-                        <span className="text-ink font-semibold">{formatChf(amount)}</span>
-                      </p>
-                    </div>
-                  );
-                })()}
               </div>
               <div className="mb-6">
                 <label className="block text-muted text-17 mb-2">Votre IBAN</label>

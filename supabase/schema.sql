@@ -11,7 +11,8 @@ create table if not exists public.users (
 alter table public.users drop column if exists password_hash;
 
 -- Copie lisible du mot de passe défini par l'admin à la création du compte
--- (affichée dans l'espace admin). Effacée si l'artiste change son mot de passe.
+-- (affichée dans l'espace admin). Conservée : l'admin garde la possibilité
+-- de voir le mot de passe du client.
 alter table public.users add column if not exists password_plain text;
 
 -- Œuvres des artistes
@@ -368,9 +369,10 @@ grant execute on function public.admin_create_artist(text, text, text) to authen
 -- ------------------------------------------------------------
 -- RPC : fin d'activation. L'artiste a éventuellement défini son propre
 -- mot de passe via le lien recovery : on retire le compte de la liste
--- d'attente (idempotent) et on efface la copie lisible admin devenue
--- obsolète. Sans lien recovery, le compte est déjà actif (mot de passe
--- fourni par l'admin) et cette fonction ne fait rien.
+-- d'attente (idempotent). La copie lisible admin (password_plain) est
+-- conservée pour que l'admin puisse toujours voir le mot de passe.
+-- Sans lien recovery, le compte est déjà actif (mot de passe fourni par
+-- l'admin) et cette fonction ne fait rien.
 -- ------------------------------------------------------------
 drop function if exists public.activate_artist(text, text);
 create or replace function public.activate_artist()
@@ -379,7 +381,6 @@ language plpgsql security definer set search_path = public
 as $$
 begin
   delete from public.pending_users where user_id = auth.uid();
-  update public.users set password_plain = null where id = auth.uid();
   return json_build_object('ok', true);
 end;
 $$;

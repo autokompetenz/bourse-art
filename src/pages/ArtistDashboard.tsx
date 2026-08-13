@@ -17,7 +17,7 @@ import {
   uploadWithdrawalProof,
 } from "@/lib/db";
 import { compressImage } from "@/utils/image";
-import { formatDate, formatChf, maskCard } from "@/utils/format";
+import { formatDate, formatChf } from "@/utils/format";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const FEE_RATE = 0.2;
@@ -559,7 +559,7 @@ export default function ArtistDashboard() {
           {card && !showCardForm ? (
             <div className="max-w-md border border-dark_border border-opacity-20 rounded-lg p-5">
               <p className="text-ink text-20 font-medium tracking-widest">
-                {maskCard(card.card_number)}
+                {card.card_number}
               </p>
               <div className="flex justify-between mt-4 gap-4">
                 <div>

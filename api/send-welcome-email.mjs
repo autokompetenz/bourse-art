@@ -1,10 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+function sendJson(res, status, payload) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(payload));
+}
+
+function applyCors(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+}
 
 function escapeHtml(text) {
   return String(text)
@@ -15,17 +21,15 @@ function escapeHtml(text) {
     .replaceAll("'", "&#39;");
 }
 
-function applyCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", CORS_HEADERS["Access-Control-Allow-Origin"]);
-  res.setHeader("Access-Control-Allow-Headers", CORS_HEADERS["Access-Control-Allow-Headers"]);
-  res.setHeader("Access-Control-Allow-Methods", CORS_HEADERS["Access-Control-Allow-Methods"]);
-}
-
 export default async function handler(req, res) {
   applyCors(res);
-  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const smtpHost = process.env.SMTP_HOST ?? "smtp.hostinger.com";
   const smtpPort = Number(process.env.SMTP_PORT ?? "465");
@@ -35,31 +39,31 @@ export default async function handler(req, res) {
   const siteUrl = (process.env.SITE_URL ?? "https://www.boursemarket.business").replace(/\/+$/, "");
 
   if (!supabaseUrl || !serviceRoleKey || !smtpUser || !smtpPassword) {
-    return res
-      .status(500)
-      .json({ ok: false, error: "Configuration serveur incomplète (SMTP ou clé service role manquants)." });
+    return sendJson(res, 500, {
+      ok: false,
+      error: "Configuration serveur incomplète (SMTP ou clé service role manquants).",
+    });
   }
   if (req.method !== "POST") {
-    return res.status(405).json({ ok: false, error: "Méthode non autorisée." });
+    return sendJson(res, 405, { ok: false, error: "Méthode non autorisée." });
   }
 
   try {
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
     if (!email) {
-      return res.status(400).json({ ok: false, error: "Paramètre email requis." });
+      return sendJson(res, 400, { ok: false, error: "Paramètre email requis." });
     }
 
-    // Vérification : seul un admin connecté peut déclencher l'envoi.
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
-      return res.status(401).json({ ok: false, error: "Non authentifié." });
+      return sendJson(res, 401, { ok: false, error: "Non authentifié." });
     }
     const accessToken = authHeader.slice("Bearer ".length);
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const { data: authData, error: authError } = await adminClient.auth.getUser(accessToken);
     if (authError || !authData?.user) {
-      return res.status(401).json({ ok: false, error: "Non authentifié." });
+      return sendJson(res, 401, { ok: false, error: "Non authentifié." });
     }
     const { data: profile } = await adminClient
       .from("users")
@@ -67,7 +71,7 @@ export default async function handler(req, res) {
       .eq("id", authData.user.id)
       .maybeSingle();
     if (!profile || profile.role !== "admin") {
-      return res.status(403).json({ ok: false, error: "Accès refusé : réservé à l'administrateur." });
+      return sendJson(res, 403, { ok: false, error: "Accès refusé : réservé à l'administrateur." });
     }
 
     const { data: pending } = await adminClient
@@ -77,10 +81,9 @@ export default async function handler(req, res) {
       .maybeSingle();
     const artistName = pending?.name ?? "Artiste";
 
-    // Lien de récupération Supabase (type recovery, pas de magic link) :
-    // l'artiste clique, définit son mot de passe, puis se connecte en
-    // email + mot de passe. Le redirect pointe vers SITE_URL (jamais
-    // localhost) car il est généré côté serveur.
+    // Lien de récupération (type recovery) : l'artiste clique, définit son
+    // mot de passe, puis se connecte en email + mot de passe. Le redirect
+    // pointe vers SITE_URL (jamais localhost) : généré côté serveur.
     const redirectTo = `${siteUrl}/connexion?activation=1`;
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: "recovery",
@@ -89,7 +92,7 @@ export default async function handler(req, res) {
     });
     const magicLink = linkData?.properties?.action_link;
     if (linkError || !magicLink) {
-      return res.status(500).json({
+      return sendJson(res, 500, {
         ok: false,
         error: `Impossible de générer le lien de connexion : ${linkError?.message ?? "erreur inconnue"}`,
       });
@@ -155,10 +158,11 @@ L'équipe Bourse&Art`,
       `,
     });
 
-    return res.status(200).json({ ok: true, to: email });
+    return sendJson(res, 200, { ok: true, to: email });
   } catch (err) {
-    return res
-      .status(500)
-      .json({ ok: false, error: `Échec de l'envoi du mail : ${err instanceof Error ? err.message : "erreur inconnue"}` });
+    return sendJson(res, 500, {
+      ok: false,
+      error: `Échec de l'envoi du mail : ${err instanceof Error ? err.message : "erreur inconnue"}`,
+    });
   }
 }

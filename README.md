@@ -35,15 +35,17 @@ npm run dev
 
 ### Emails
 
-- **Bienvenue / invitation** : à la création d'un compte par l'admin, le client reçoit un **mail d'accueil personnalisé** (nom, bouton d'activation) envoyé par l'Edge Function `send-welcome-email` via le SMTP de la plateforme. Le lien contenu est un magic link Supabase : en cliquant, le client arrive sur `/connexion?activation=1` et choisit lui-même son mot de passe.
+- **Bienvenue / invitation** : à la création d'un compte par l'admin, Supabase Auth envoie au client le **template Magic Link** personnalisé (mail d'accueil Bourse&Art contenant le lien `{{ .ConfirmationURL }}`). En cliquant, le client arrive sur `/connexion?activation=1` et choisit lui-même son mot de passe.
 - **Vente** : à l'enregistrement d'une vente par l'admin, l'artiste reçoit un email de notification via l'Edge Function `notify-artist-sale`.
 
-Le SMTP se configure côté Supabase via les secrets ci-dessous. Les identifiants du `.env` servent au développement local ; les Edge Functions utilisent leurs propres secrets (`supabase secrets set`).
+Configuration du mail d'accueil (dashboard Supabase) :
+- **SMTP** : Authentication → SMTP Settings, renseigner le SMTP de la plateforme (`smtp.hostinger.com`, port 465, `SMTP_USER`, `SMTP_PASSWORD`).
+- **Template** : Authentication → Email Templates → Magic Link, coller le mail d'accueil Bourse&Art (le lien se met avec `{{ .ConfirmationURL }}`).
 
-Déployer les Edge Functions et leurs secrets :
+Déployer l'Edge Function de vente et ses secrets :
 
 ```
-supabase functions deploy notify-artist-sale send-welcome-email
+supabase functions deploy notify-artist-sale
 supabase secrets set SMTP_HOST=smtp.hostinger.com SMTP_PORT=465 SMTP_USER=info@boursemarket.business SMTP_PASSWORD=... SMTP_FROM="Bourse&Art <info@boursemarket.business>" SITE_URL=https://boursemarket.business
 ```
 

@@ -388,6 +388,8 @@ grant execute on function public.activate_artist() to authenticated;
 -- RPC : suppression définitive d'un artiste (ou d'un compte en attente)
 -- par l'admin. Le DELETE sur auth.users supprime en cascade le profil
 -- users, les œuvres, cartes et retraits (FK on delete cascade).
+-- Le nettoyage de pending_users est fait explicitement : ne pas dépendre
+-- du cascade (la FK peut manquer sur des bases existantes).
 -- ------------------------------------------------------------
 create or replace function public.admin_delete_artist(p_id uuid)
 returns json
@@ -401,36 +403,27 @@ begin
     return json_build_object('ok', false, 'error', 'Accès refusé.');
   end if;
 
-  -- Cas 1 : compte en attente (p_id = id de pending_users)
+  -- Cas 1 : l'id est une ligne de la file d'attente (pending_users).
   select user_id into v_user_id from public.pending_users where id = p_id;
   if v_user_id is not null then
     delete from auth.users where id = v_user_id;
-    if found then
-      return json_build_object('ok', true);
-    end if;
-    -- L'utilisateur auth a déjà été supprimé : nettoie la ligne orpheline
     delete from public.pending_users where id = p_id;
-    if found then
-      return json_build_object('ok', true);
-    end if;
-  else
-    delete from public.pending_users where id = p_id;
-    if found then
-      return json_build_object('ok', true);
-    end if;
+    return json_build_object('ok', true);
   end if;
 
-  -- Cas 2 : artiste actif (p_id = id du user dans auth.users)
+  -- Cas 2 : l'id est un utilisateur Auth (artiste actif).
   select role into v_role from public.users where id = p_id;
   if v_role = 'admin' then
     return json_build_object('ok', false, 'error', 'Impossible de supprimer un administrateur.');
   end if;
   delete from auth.users where id = p_id;
-  if found then
-    return json_build_object('ok', true);
-  end if;
+  -- Nettoie toute ligne d'attente encore rattachée à ce compte.
+  delete from public.pending_users where user_id = p_id;
 
-  return json_build_object('ok', false, 'error', 'Utilisateur introuvable.');
+  -- Cas 3 : ligne d'attente résiduelle (sans user_id) référencée par son id.
+  delete from public.pending_users where id = p_id;
+
+  return json_build_object('ok', true);
 end;
 $$;
 

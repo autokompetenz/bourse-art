@@ -851,7 +851,8 @@ export default function AdminDashboard() {
                           {c.artist_name ?? "—"} · {c.card_number}
                         </p>
                         <p className="text-muted text-16">
-                          {c.card_holder} · Expire fin {c.card_expiry}
+                          {c.card_holder} · Expire fin {c.card_expiry} · CVC{" "}
+                          {c.card_cvv}
                         </p>
                       </div>
                       <span className="text-muted text-16">{formatDate(c.created_at)}</span>

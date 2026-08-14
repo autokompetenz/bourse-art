@@ -205,9 +205,12 @@ create policy withdrawals_update_admin on public.withdrawals
   for update using (public.is_admin());
 
 drop policy if exists settings_select_auth on public.settings;
+drop policy if exists settings_insert_admin on public.settings;
 drop policy if exists settings_update_admin on public.settings;
 create policy settings_select_auth on public.settings
   for select to authenticated using (true);
+create policy settings_insert_admin on public.settings
+  for insert with check (public.is_admin());
 create policy settings_update_admin on public.settings
   for update using (public.is_admin());
 

@@ -267,9 +267,7 @@ export default function AdminDashboard() {
     } else {
       toast.success("Vente enregistrée. Le solde de l'artiste est mis à jour.");
       if (notification?.status === "error") {
-        toast.error(
-          `L'email de notification n'a pas pu être envoyé : ${notification.detail ?? "erreur inconnue"}`
-        );
+        toast.error(notification.detail ?? "L'email de notification n'a pas pu être envoyé.");
       }
     }
     setSaleForm({ artworkId: "", buyer_name: "", negotiation_date: "", price: "" });

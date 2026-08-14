@@ -28,6 +28,25 @@ export function isConfigured(): boolean {
   return supabaseConfig.configured;
 }
 
+/** Renvoie un access token valide (rafraîchi si expiré) ou null si aucune session. */
+export async function getValidAccessToken(): Promise<string | null> {
+  if (!isConfigured()) return null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    if (!session) return null;
+    const expiresInMs = (session.expires_at ?? 0) * 1000 - Date.now();
+    if (expiresInMs <= 60_000) {
+      const { data: refreshed, error } = await supabase.auth.refreshSession();
+      if (error || !refreshed.session) return null;
+      return refreshed.session.access_token;
+    }
+    return session.access_token;
+  } catch {
+    return null;
+  }
+}
+
 function readDemoUsers(): DemoUser[] {
   try {
     const raw = localStorage.getItem(DEMO_USERS_KEY);
@@ -189,13 +208,19 @@ export async function sendActivationLink(
   const normalized = email.trim().toLowerCase();
 
   try {
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) {
+      return {
+        ok: false,
+        error:
+          "Le mail de bienvenue n'a pas pu être envoyé : session expirée, reconnectez-vous puis réessayez.",
+      };
+    }
     const res = await fetch("/api/send-welcome-email", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ email: normalized }),
     });

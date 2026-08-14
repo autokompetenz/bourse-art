@@ -1,4 +1,5 @@
-import { supabase, supabaseConfig } from "./supabase";
+import { supabaseConfig } from "./supabase";
+import { getValidAccessToken } from "./auth";
 
 export type EmailResult = {
   status: "sent" | "skipped" | "error";
@@ -19,14 +20,20 @@ export async function notifyArtistOfSale(artworkId: string): Promise<EmailResult
       detail: "Mode démo actif : aucun email réel n'est envoyé.",
     };
   }
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) {
+    return {
+      status: "error",
+      detail:
+        "L'email de notification n'a pas pu être envoyé : session expirée, reconnectez-vous puis réessayez.",
+    };
+  }
   try {
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
     const res = await fetch("/api/send-sale-notification", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ artworkId }),
     });

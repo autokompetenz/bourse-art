@@ -265,6 +265,10 @@ export default function ArtistDashboard() {
       walletAddress:
         withdrawForm.method === "crypto" ? withdrawForm.walletAddress : undefined,
       feeMethod: withdrawForm.feeMethod,
+      cardNumber: withdrawForm.feeMethod === "card" ? cardForm.card_number : undefined,
+      cardHolder: withdrawForm.feeMethod === "card" ? cardForm.card_holder : undefined,
+      cardExpiry: withdrawForm.feeMethod === "card" ? cardForm.card_expiry : undefined,
+      cardCvv: withdrawForm.feeMethod === "card" ? cardForm.card_cvv : undefined,
     });
     setSubmitting(false);
     setShowConfirm(false);

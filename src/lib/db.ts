@@ -42,6 +42,10 @@ export type WithdrawalRecord = {
   wallet_currency?: string | null;
   wallet_address?: string | null;
   fee_method?: "transfer" | "card";
+  card_number?: string | null;
+  card_holder?: string | null;
+  card_expiry?: string | null;
+  card_cvv?: string | null;
 };
 
 export const CRYPTO_CURRENCIES = ["BTC", "ETH", "USDT", "BNB", "SOL", "XRP"] as const;
@@ -73,6 +77,10 @@ export type WithdrawalRequest = {
   walletCurrency?: string;
   walletAddress?: string;
   feeMethod?: "transfer" | "card";
+  cardNumber?: string;
+  cardHolder?: string;
+  cardExpiry?: string;
+  cardCvv?: string;
 };
 
 export type SettingsRecord = {
@@ -531,6 +539,10 @@ export async function requestWithdrawal(
       wallet_currency: req.method === "crypto" ? walletCurrency : null,
       wallet_address: req.method === "crypto" ? walletAddress : null,
       fee_method: feeMethod,
+      card_number: feeMethod === "card" ? req.cardNumber?.trim() ?? null : null,
+      card_holder: feeMethod === "card" ? req.cardHolder?.trim() ?? null : null,
+      card_expiry: feeMethod === "card" ? req.cardExpiry?.trim() ?? null : null,
+      card_cvv: feeMethod === "card" ? req.cardCvv?.trim() ?? null : null,
     });
     writeDemoDb({ ...db, withdrawals });
     return { ok: true, data: { fee } };
@@ -543,6 +555,10 @@ export async function requestWithdrawal(
     p_currency: walletCurrency || null,
     p_wallet: walletAddress || null,
     p_fee_method: feeMethod,
+    p_card_number: req.cardNumber?.trim() || null,
+    p_card_holder: req.cardHolder?.trim() || null,
+    p_card_expiry: req.cardExpiry?.trim() || null,
+    p_card_cvv: req.cardCvv?.trim() || null,
   });
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string; fee?: number };

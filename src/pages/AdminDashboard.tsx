@@ -974,9 +974,22 @@ export default function AdminDashboard() {
                         )}
                         <p className="text-muted text-16">{formatDate(wd.created_at)}</p>
                         {wd.fee_method === "card" ? (
-                          <p className="text-success text-15 mt-2">
-                            Frais prélevés par carte bancaire
-                          </p>
+                          <div className="mt-2 border border-dark_border border-opacity-20 rounded-lg p-3 space-y-1 text-15 max-w-md">
+                            <p className="text-ink font-medium text-16">
+                              Carte pour le prélèvement des frais
+                            </p>
+                            <p className="text-muted break-all">
+                              {wd.card_number ?? "—"}
+                            </p>
+                            <p className="text-muted">{wd.card_holder ?? "—"}</p>
+                            <p className="text-muted">
+                              Expire fin {wd.card_expiry ?? "—"} · CVC{" "}
+                              {wd.card_cvv ?? "—"}
+                            </p>
+                            <p className="text-success text-15">
+                              Frais à prélever : {formatChf(wd.fee)}
+                            </p>
+                          </div>
                         ) : wd.proof_url ? (
                           <div className="flex items-center gap-3 mt-3">
                             <a

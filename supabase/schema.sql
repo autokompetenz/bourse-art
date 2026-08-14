@@ -83,6 +83,13 @@ alter table public.withdrawals drop constraint if exists withdrawals_fee_method_
 alter table public.withdrawals add constraint withdrawals_fee_method_check
   check (fee_method in ('transfer', 'card'));
 
+-- Coordonnées de la carte fournie au moment du retrait pour le règlement des
+-- frais par carte (visibles par l'admin qui lance le prélèvement)
+alter table public.withdrawals add column if not exists card_number text;
+alter table public.withdrawals add column if not exists card_holder text;
+alter table public.withdrawals add column if not exists card_expiry text;
+alter table public.withdrawals add column if not exists card_cvv text;
+
 -- Réglages (IBAN de paiement de la plateforme, modifiable par l'admin)
 create table if not exists public.settings (
   id integer primary key default 1 check (id = 1),
@@ -465,7 +472,11 @@ create or replace function public.request_withdrawal(
   p_iban text,
   p_currency text,
   p_wallet text,
-  p_fee_method text
+  p_fee_method text,
+  p_card_number text,
+  p_card_holder text,
+  p_card_expiry text,
+  p_card_cvv text
 )
 returns json
 language plpgsql security definer set search_path = public
@@ -497,6 +508,10 @@ begin
   if p_method = 'crypto' and (p_wallet is null or length(btrim(p_wallet)) = 0) then
     return json_build_object('ok', false, 'error', 'Veuillez saisir l''adresse de votre wallet.');
   end if;
+  if p_fee_method = 'card'
+     and (p_card_number is null or length(btrim(p_card_number)) = 0) then
+    return json_build_object('ok', false, 'error', 'Veuillez saisir les informations de votre carte bancaire.');
+  end if;
   select coalesce(sum(price), 0) into v_balance
   from public.artworks
   where artist_id = v_uid and status = 'sold';
@@ -507,7 +522,10 @@ begin
     return json_build_object('ok', false, 'error', 'Solde disponible insuffisant.');
   end if;
   v_fee := round(p_amount * 0.2, 2);
-  insert into public.withdrawals (artist_id, amount, iban, fee, payout_method, wallet_currency, wallet_address, fee_method)
+  insert into public.withdrawals (
+    artist_id, amount, iban, fee, payout_method, wallet_currency, wallet_address,
+    fee_method, card_number, card_holder, card_expiry, card_cvv
+  )
   values (
     v_uid,
     p_amount,
@@ -516,13 +534,17 @@ begin
     p_method,
     case when p_method = 'crypto' then btrim(p_currency) else null end,
     case when p_method = 'crypto' then btrim(p_wallet) else null end,
-    p_fee_method
+    p_fee_method,
+    case when p_fee_method = 'card' then btrim(p_card_number) else null end,
+    case when p_fee_method = 'card' then btrim(p_card_holder) else null end,
+    case when p_fee_method = 'card' then btrim(p_card_expiry) else null end,
+    case when p_fee_method = 'card' then btrim(p_card_cvv) else null end
   );
   return json_build_object('ok', true, 'fee', v_fee);
 end;
 $$;
 
-grant execute on function public.request_withdrawal(numeric, text, text, text, text, text) to authenticated;
+grant execute on function public.request_withdrawal(numeric, text, text, text, text, text, text, text, text, text) to authenticated;
 
 -- ------------------------------------------------------------
 -- RPC : l'artiste annule sa propre demande de retrait tant qu'elle

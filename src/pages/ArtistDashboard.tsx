@@ -296,6 +296,7 @@ export default function ArtistDashboard() {
       return;
     }
     toast.success("Demande de retrait annulée.");
+    setPendingWithdrawalsInfo((prev) => prev.filter((w) => w.id !== id));
     loadData();
   };
 
@@ -994,6 +995,13 @@ export default function ArtistDashboard() {
                   <p className="text-muted text-16">
                     Demandé le {formatDate(wd.created_at)}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => handleCancelWithdrawal(wd.id)}
+                    className="mt-1 text-error text-16 hover:underline"
+                  >
+                    Annuler cette demande
+                  </button>
                 </div>
               ))}
             </div>

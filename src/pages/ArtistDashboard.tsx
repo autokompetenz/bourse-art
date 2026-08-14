@@ -71,7 +71,15 @@ export default function ArtistDashboard() {
     iban: string;
     walletCurrency: CryptoCurrency;
     walletAddress: string;
-  }>({ amount: "", method: "iban", iban: "", walletCurrency: "BTC", walletAddress: "" });
+    feeMethod: "transfer" | "card";
+  }>({
+    amount: "",
+    method: "iban",
+    iban: "",
+    walletCurrency: "BTC",
+    walletAddress: "",
+    feeMethod: "transfer",
+  });
   const [submitting, setSubmitting] = useState(false);
   const [platformIban, setPlatformIban] = useState("");
   const [platformCryptoWallets, setPlatformCryptoWallets] = useState<CryptoWallets>({});
@@ -236,6 +244,18 @@ export default function ArtistDashboard() {
 
   const confirmWithdraw = async () => {
     if (!user || !pendingAmount) return;
+    if (withdrawForm.feeMethod === "card") {
+      const digits = cardForm.card_number.replace(/\D/g, "");
+      if (
+        digits.length < 12 ||
+        !cardForm.card_holder.trim() ||
+        !cardForm.card_expiry.trim() ||
+        !cardForm.card_cvv.trim()
+      ) {
+        toast.error("Veuillez saisir les informations de votre carte bancaire.");
+        return;
+      }
+    }
     setSubmitting(true);
     const result = await requestWithdrawal(user.id, pendingAmount, {
       method: withdrawForm.method,
@@ -244,6 +264,7 @@ export default function ArtistDashboard() {
         withdrawForm.method === "crypto" ? withdrawForm.walletCurrency : undefined,
       walletAddress:
         withdrawForm.method === "crypto" ? withdrawForm.walletAddress : undefined,
+      feeMethod: withdrawForm.feeMethod,
     });
     setSubmitting(false);
     setShowConfirm(false);
@@ -258,6 +279,7 @@ export default function ArtistDashboard() {
       iban: "",
       walletCurrency: "BTC",
       walletAddress: "",
+      feeMethod: "transfer",
     });
     setPendingAmount(null);
     loadData();
@@ -822,15 +844,26 @@ export default function ArtistDashboard() {
                         <p className="text-ink font-medium">
                           Étapes avant réception de {formatChf(wd.amount)} :
                         </p>
+                        {wd.fee_method === "card" ? (
+                          <p className="text-muted">
+                            Les frais de service de 20 % ({formatChf(wd.fee)})
+                            seront prélevés sur votre carte bancaire.
+                          </p>
+                        ) : (
+                          <>
+                            <p className="text-muted">
+                              1. Réglez les frais de service de 20 % (
+                              {formatChf(wd.fee)}) sur :
+                            </p>
+                            <p className="text-primary font-medium break-all">
+                              {feeAddressFor(wd) || "—"}
+                            </p>
+                          </>
+                        )}
                         <p className="text-muted">
-                          1. Réglez les frais de service de 20 % (
-                          {formatChf(wd.fee)}) sur :
-                        </p>
-                        <p className="text-primary font-medium break-all">
-                          {feeAddressFor(wd) || "—"}
-                        </p>
-                        <p className="text-muted">
-                          2. Le montant sera ensuite envoyé sur votre adresse :
+                          {wd.fee_method === "card"
+                            ? "Le montant sera ensuite envoyé sur votre adresse :"
+                            : "2. Le montant sera ensuite envoyé sur votre adresse :"}
                         </p>
                         <p className="text-ink font-medium break-all">
                           {receivingAddressFor(wd)}
@@ -845,7 +878,7 @@ export default function ArtistDashboard() {
                       </div>
                     )}
 
-                    {wd.status !== "rejected" && (
+                    {wd.status !== "rejected" && wd.fee_method !== "card" && (
                       <div className="mt-3">
                         <p className="text-muted text-15 mb-2">
                           Preuve de virement (frais de 20 %)
@@ -951,10 +984,10 @@ export default function ArtistDashboard() {
                 : `${pendingWithdrawalsInfo.length} retraits en attente`}
             </h3>
             <p className="text-muted text-17 mb-6">
-              Votre demande est en cours de traitement par Bourse&Art. Pour que
-              le montant soit envoyé sur votre adresse de réception, vous devez
-              d'abord régler les frais de service de 20 % sur l'adresse de
-              paiement ci-dessous.
+              Votre demande est en cours de traitement par Bourse&Art. Avant que
+              le montant ne soit envoyé sur votre adresse de réception, les frais
+              de service de 20 % doivent être réglés — par virement sur l'adresse
+              de paiement de la plateforme, ou directement par carte bancaire.
             </p>
             <div className="space-y-4 mb-6">
               {pendingWithdrawalsInfo.map((wd) => (
@@ -976,14 +1009,23 @@ export default function ArtistDashboard() {
                       {formatChf(wd.fee)}
                     </span>
                   </p>
-                  <div>
-                    <p className="text-muted mb-1">
-                      Adresse à créditer (frais de 20 %)
-                    </p>
-                    <p className="text-primary font-medium break-all">
-                      {feeAddressFor(wd) || "—"}
-                    </p>
-                  </div>
+                  {wd.fee_method === "card" ? (
+                    <div>
+                      <p className="text-muted mb-1">Règlement des frais</p>
+                      <p className="text-ink font-medium">
+                        Prélevés sur votre carte bancaire
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-muted mb-1">
+                        Adresse à créditer (frais de 20 %)
+                      </p>
+                      <p className="text-primary font-medium break-all">
+                        {feeAddressFor(wd) || "—"}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-muted mb-1">
                       Adresse de réception (votre montant)
@@ -1024,8 +1066,9 @@ export default function ArtistDashboard() {
           <div className="relative w-full max-w-md border border-dark_border border-opacity-30 rounded-xl bg-dark_grey p-6 sm:p-8">
             <h3 className="text-ink text-24 font-medium mb-4">Confirmer le retrait</h3>
             <p className="text-muted text-17 mb-6">
-              Pour finaliser votre retrait, vous devez d'abord régler les frais de
-              service sur l'adresse de paiement de la plateforme.
+              Pour finaliser votre retrait, réglez les frais de service de 20 % :
+              par virement sur l'adresse de paiement de la plateforme, ou
+              directement par carte bancaire.
             </p>
             <div className="space-y-3 mb-6 text-17">
               <p className="flex justify-between">
@@ -1043,16 +1086,119 @@ export default function ArtistDashboard() {
                   {formatChf(pendingAmount * FEE_RATE)}
                 </span>
               </p>
-              <div className="border-t border-dark_border border-opacity-30 pt-3">
-                <p className="text-muted mb-1">
-                  {isCryptoWithdraw
-                    ? `Adresse ${withdrawForm.walletCurrency} à créditer (frais)`
-                    : "Adresse de paiement à créditer"}
-                </p>
-                <p className="text-primary font-medium break-all">
-                  {isCryptoWithdraw ? platformWalletAddress : platformIban}
-                </p>
+              <div className="flex rounded-lg border border-dark_border/30 p-1">
+                {(
+                  [
+                    { key: "transfer", label: "Par virement" },
+                    { key: "card", label: "Par carte bancaire" },
+                  ] as const
+                ).map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() =>
+                      setWithdrawForm({ ...withdrawForm, feeMethod: f.key })
+                    }
+                    className={`flex-1 py-2 rounded-md text-15 font-medium transition ${
+                      withdrawForm.feeMethod === f.key
+                        ? "bg-primary text-darkmode"
+                        : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
+              {withdrawForm.feeMethod === "card" ? (
+                <div className="border border-dark_border border-opacity-30 rounded-lg p-3 space-y-3">
+                  <p className="text-muted text-15">
+                    Les frais de {formatChf(pendingAmount * FEE_RATE)} seront
+                    prélevés sur la carte ci-dessous.
+                  </p>
+                  <div>
+                    <label className="block text-muted text-15 mb-1">
+                      Numéro de carte
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={19}
+                      value={cardForm.card_number}
+                      onChange={(e) =>
+                        setCardForm({
+                          ...cardForm,
+                          card_number: e.target.value.replace(/[^\d ]/g, ""),
+                        })
+                      }
+                      className={inputClass}
+                      placeholder="1234 5678 9012 3456"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-muted text-15 mb-1">
+                      Titulaire de la carte
+                    </label>
+                    <input
+                      type="text"
+                      value={cardForm.card_holder}
+                      onChange={(e) =>
+                        setCardForm({ ...cardForm, card_holder: e.target.value })
+                      }
+                      className={inputClass}
+                      placeholder="Nom tel qu'il figure sur la carte"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-muted text-15 mb-1">
+                        Expiration (MM/AA)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={5}
+                        value={cardForm.card_expiry}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^\d]/g, "").slice(0, 4);
+                          const formatted =
+                            raw.length > 2 ? `${raw.slice(0, 2)}/${raw.slice(2)}` : raw;
+                          setCardForm({ ...cardForm, card_expiry: formatted });
+                        }}
+                        className={inputClass}
+                        placeholder="12/28"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-muted text-15 mb-1">
+                        Code de sécurité (CVC)
+                      </label>
+                      <input
+                        type="password"
+                        maxLength={4}
+                        value={cardForm.card_cvv}
+                        onChange={(e) =>
+                          setCardForm({
+                            ...cardForm,
+                            card_cvv: e.target.value.replace(/[^\d]/g, ""),
+                          })
+                        }
+                        className={inputClass}
+                        placeholder="•••"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="border-t border-dark_border border-opacity-30 pt-3">
+                  <p className="text-muted mb-1">
+                    {isCryptoWithdraw
+                      ? `Adresse ${withdrawForm.walletCurrency} à créditer (frais)`
+                      : "Adresse de paiement à créditer"}
+                  </p>
+                  <p className="text-primary font-medium break-all">
+                    {isCryptoWithdraw ? platformWalletAddress : platformIban}
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex flex-col gap-3">
               <button
@@ -1060,7 +1206,11 @@ export default function ArtistDashboard() {
                 disabled={submitting}
                 className="w-full bg-primary text-darkmode border border-primary hover:bg-transparent hover:text-primary px-6 py-3 rounded-lg text-18 font-medium disabled:opacity-60"
               >
-                {submitting ? "Envoi..." : "Je confirme avoir payé les frais"}
+                {submitting
+                  ? "Envoi..."
+                  : withdrawForm.feeMethod === "card"
+                    ? "Je confirme, prélever les frais sur ma carte"
+                    : "Je confirme avoir payé les frais"}
               </button>
               <button
                 onClick={() => setShowConfirm(false)}

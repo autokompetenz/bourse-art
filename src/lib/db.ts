@@ -41,6 +41,7 @@ export type WithdrawalRecord = {
   payout_method?: "iban" | "crypto";
   wallet_currency?: string | null;
   wallet_address?: string | null;
+  fee_method?: "transfer" | "card";
 };
 
 export const CRYPTO_CURRENCIES = ["BTC", "ETH", "USDT", "BNB", "SOL", "XRP"] as const;
@@ -71,6 +72,7 @@ export type WithdrawalRequest = {
   iban?: string;
   walletCurrency?: string;
   walletAddress?: string;
+  feeMethod?: "transfer" | "card";
 };
 
 export type SettingsRecord = {
@@ -484,6 +486,7 @@ export async function requestWithdrawal(
   const iban = req.iban?.trim() ?? "";
   const walletCurrency = req.walletCurrency?.trim().toUpperCase() ?? "";
   const walletAddress = req.walletAddress?.trim() ?? "";
+  const feeMethod = req.feeMethod === "card" ? "card" : "transfer";
 
   if (!amount || amount <= 0) return { ok: false, error: "Montant invalide." };
   if (req.method !== "iban" && req.method !== "crypto") {
@@ -527,6 +530,7 @@ export async function requestWithdrawal(
       payout_method: req.method,
       wallet_currency: req.method === "crypto" ? walletCurrency : null,
       wallet_address: req.method === "crypto" ? walletAddress : null,
+      fee_method: feeMethod,
     });
     writeDemoDb({ ...db, withdrawals });
     return { ok: true, data: { fee } };
@@ -538,6 +542,7 @@ export async function requestWithdrawal(
     p_iban: iban || null,
     p_currency: walletCurrency || null,
     p_wallet: walletAddress || null,
+    p_fee_method: feeMethod,
   });
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string; fee?: number };

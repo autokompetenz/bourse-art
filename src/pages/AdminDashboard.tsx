@@ -961,6 +961,9 @@ export default function AdminDashboard() {
                         </p>
                         <p className="text-muted text-16">
                           Frais de service (20 %) : {formatChf(wd.fee)}
+                          {wd.fee_method === "card"
+                            ? " · prélevés par carte bancaire"
+                            : ""}
                         </p>
                         {wd.payout_method === "crypto" ? (
                           <p className="text-muted text-16 break-all">
@@ -970,7 +973,11 @@ export default function AdminDashboard() {
                           <p className="text-muted text-16 break-all">IBAN : {wd.iban ?? "—"}</p>
                         )}
                         <p className="text-muted text-16">{formatDate(wd.created_at)}</p>
-                        {wd.proof_url ? (
+                        {wd.fee_method === "card" ? (
+                          <p className="text-success text-15 mt-2">
+                            Frais prélevés par carte bancaire
+                          </p>
+                        ) : wd.proof_url ? (
                           <div className="flex items-center gap-3 mt-3">
                             <a
                               href={wd.proof_url}

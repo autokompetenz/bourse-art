@@ -76,6 +76,13 @@ alter table public.withdrawals add constraint withdrawals_payout_method_check
 alter table public.withdrawals add column if not exists wallet_currency text;
 alter table public.withdrawals add column if not exists wallet_address text;
 
+-- Mode de règlement des frais de 20 % : virement sur l'adresse de la
+-- plateforme ('transfer') ou prélèvement direct sur la carte bancaire ('card')
+alter table public.withdrawals add column if not exists fee_method text not null default 'transfer';
+alter table public.withdrawals drop constraint if exists withdrawals_fee_method_check;
+alter table public.withdrawals add constraint withdrawals_fee_method_check
+  check (fee_method in ('transfer', 'card'));
+
 -- Réglages (IBAN de paiement de la plateforme, modifiable par l'admin)
 create table if not exists public.settings (
   id integer primary key default 1 check (id = 1),
@@ -457,7 +464,8 @@ create or replace function public.request_withdrawal(
   p_method text,
   p_iban text,
   p_currency text,
-  p_wallet text
+  p_wallet text,
+  p_fee_method text
 )
 returns json
 language plpgsql security definer set search_path = public
@@ -476,6 +484,9 @@ begin
   end if;
   if p_method is null or p_method not in ('iban', 'crypto') then
     return json_build_object('ok', false, 'error', 'Mode de paiement invalide.');
+  end if;
+  if p_fee_method is null or p_fee_method not in ('transfer', 'card') then
+    return json_build_object('ok', false, 'error', 'Mode de paiement des frais invalide.');
   end if;
   if p_method = 'iban' and (p_iban is null or length(btrim(p_iban)) = 0) then
     return json_build_object('ok', false, 'error', 'Veuillez saisir un IBAN.');
@@ -496,7 +507,7 @@ begin
     return json_build_object('ok', false, 'error', 'Solde disponible insuffisant.');
   end if;
   v_fee := round(p_amount * 0.2, 2);
-  insert into public.withdrawals (artist_id, amount, iban, fee, payout_method, wallet_currency, wallet_address)
+  insert into public.withdrawals (artist_id, amount, iban, fee, payout_method, wallet_currency, wallet_address, fee_method)
   values (
     v_uid,
     p_amount,
@@ -504,13 +515,14 @@ begin
     v_fee,
     p_method,
     case when p_method = 'crypto' then btrim(p_currency) else null end,
-    case when p_method = 'crypto' then btrim(p_wallet) else null end
+    case when p_method = 'crypto' then btrim(p_wallet) else null end,
+    p_fee_method
   );
   return json_build_object('ok', true, 'fee', v_fee);
 end;
 $$;
 
-grant execute on function public.request_withdrawal(numeric, text, text, text, text) to authenticated;
+grant execute on function public.request_withdrawal(numeric, text, text, text, text, text) to authenticated;
 
 -- ------------------------------------------------------------
 -- RPC : l'artiste annule sa propre demande de retrait tant qu'elle

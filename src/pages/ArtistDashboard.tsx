@@ -5,13 +5,17 @@ import { useAuth } from "@/context/AuthContext";
 import {
   ArtworkRecord,
   CardRecord,
+  CryptoCurrency,
+  CryptoWallets,
   WithdrawalRecord,
+  CRYPTO_CURRENCIES,
   createArtwork,
   deleteArtwork,
   getCard,
   getSettings,
   listArtworks,
   listWithdrawals,
+  parseCryptoWallets,
   requestWithdrawal,
   saveCard,
   uploadWithdrawalProof,
@@ -60,9 +64,16 @@ export default function ArtistDashboard() {
     }
   };
 
-  const [withdrawForm, setWithdrawForm] = useState({ amount: "", iban: "" });
+  const [withdrawForm, setWithdrawForm] = useState<{
+    amount: string;
+    method: "iban" | "crypto";
+    iban: string;
+    walletCurrency: CryptoCurrency;
+    walletAddress: string;
+  }>({ amount: "", method: "iban", iban: "", walletCurrency: "BTC", walletAddress: "" });
   const [submitting, setSubmitting] = useState(false);
   const [platformIban, setPlatformIban] = useState("");
+  const [platformCryptoWallets, setPlatformCryptoWallets] = useState<CryptoWallets>({});
   const [pendingAmount, setPendingAmount] = useState<number | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -102,6 +113,7 @@ export default function ArtistDashboard() {
       setArtworks(artRes);
       setWithdrawals(wdRes);
       setPlatformIban(setRes?.iban ?? "");
+      setPlatformCryptoWallets(parseCryptoWallets(setRes?.crypto_wallets ?? null));
       setCard(cardRes);
       if (cardRes) {
         setCardForm({
@@ -125,6 +137,11 @@ export default function ArtistDashboard() {
     .filter((w) => w.status === "pending")
     .reduce((sum, w) => sum + w.amount, 0);
   const availableBalance = Math.max(totalBalance - pendingWithdrawals, 0);
+
+  const isCryptoWithdraw = withdrawForm.method === "crypto";
+  const platformWalletAddress = isCryptoWithdraw
+    ? platformCryptoWallets[withdrawForm.walletCurrency] ?? ""
+    : "";
 
   const handleAddArtwork = async (e: FormEvent) => {
     e.preventDefault();
@@ -173,9 +190,26 @@ export default function ArtistDashboard() {
       toast.error("Le montant dépasse votre solde disponible.");
       return;
     }
-    if (!platformIban) {
-      toast.error("L'adresse de paiement n'est pas encore configurée. Contactez Bourse&Art.");
-      return;
+    if (withdrawForm.method === "crypto") {
+      if (!withdrawForm.walletAddress.trim()) {
+        toast.error("Veuillez saisir l'adresse de votre wallet.");
+        return;
+      }
+      if (!platformWalletAddress) {
+        toast.error(
+          `Aucune adresse ${withdrawForm.walletCurrency} configurée. Contactez Bourse&Art.`
+        );
+        return;
+      }
+    } else {
+      if (!withdrawForm.iban.trim()) {
+        toast.error("Veuillez saisir un IBAN.");
+        return;
+      }
+      if (!platformIban) {
+        toast.error("L'adresse de paiement n'est pas encore configurée. Contactez Bourse&Art.");
+        return;
+      }
     }
     setPendingAmount(amount);
     setShowConfirm(true);
@@ -184,7 +218,14 @@ export default function ArtistDashboard() {
   const confirmWithdraw = async () => {
     if (!user || !pendingAmount) return;
     setSubmitting(true);
-    const result = await requestWithdrawal(user.id, pendingAmount, withdrawForm.iban);
+    const result = await requestWithdrawal(user.id, pendingAmount, {
+      method: withdrawForm.method,
+      iban: withdrawForm.method === "iban" ? withdrawForm.iban : undefined,
+      walletCurrency:
+        withdrawForm.method === "crypto" ? withdrawForm.walletCurrency : undefined,
+      walletAddress:
+        withdrawForm.method === "crypto" ? withdrawForm.walletAddress : undefined,
+    });
     setSubmitting(false);
     setShowConfirm(false);
     if (!result.ok) {
@@ -192,7 +233,13 @@ export default function ArtistDashboard() {
       return;
     }
     toast.success("Demande de retrait envoyée. Elle sera traitée par Bourse&Art.");
-    setWithdrawForm({ amount: "", iban: "" });
+    setWithdrawForm({
+      amount: "",
+      method: "iban",
+      iban: "",
+      walletCurrency: "BTC",
+      walletAddress: "",
+    });
     setPendingAmount(null);
     loadData();
   };
@@ -498,8 +545,8 @@ export default function ArtistDashboard() {
           <section className="border border-dark_border/25 rounded-xl p-6 bg-white">
             <h2 className="text-ink text-24 font-medium mb-4">Demander un retrait</h2>
             <p className="text-muted text-17 mb-6">
-              Saisissez le montant à retirer et votre IBAN. Votre demande sera
-              traitée par Bourse&Art.
+              Saisissez le montant à retirer, puis choisissez un virement bancaire
+              ou une crypto-monnaie pour recevoir vos fonds.
             </p>
             <form onSubmit={handleWithdraw}>
               <div className="mb-4">
@@ -515,17 +562,77 @@ export default function ArtistDashboard() {
                   placeholder="0.00"
                 />
               </div>
-              <div className="mb-6">
-                <label className="block text-muted text-17 mb-2">Votre IBAN</label>
-                <input
-                  type="text"
-                  required
-                  value={withdrawForm.iban}
-                  onChange={(e) => setWithdrawForm({ ...withdrawForm, iban: e.target.value })}
-                  className={inputClass}
-                  placeholder="FR76 3000 6000 0112 3456 7890 189"
-                />
+              <div className="flex rounded-lg border border-dark_border/30 p-1 mb-4">
+                {(
+                  [
+                    { key: "iban", label: "Virement bancaire" },
+                    { key: "crypto", label: "Crypto wallet" },
+                  ] as const
+                ).map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => setWithdrawForm({ ...withdrawForm, method: m.key })}
+                    className={`flex-1 py-2 rounded-md text-16 font-medium transition ${
+                      withdrawForm.method === m.key
+                        ? "bg-primary text-darkmode"
+                        : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
               </div>
+              {withdrawForm.method === "crypto" ? (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-muted text-17 mb-2">Crypto-monnaie</label>
+                    <select
+                      value={withdrawForm.walletCurrency}
+                      onChange={(e) =>
+                        setWithdrawForm({
+                          ...withdrawForm,
+                          walletCurrency: e.target.value as CryptoCurrency,
+                        })
+                      }
+                      className={inputClass}
+                    >
+                      {CRYPTO_CURRENCIES.map((c) => (
+                        <option key={c} value={c} className="bg-dark_grey">
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-6">
+                    <label className="block text-muted text-17 mb-2">
+                      Adresse de votre wallet ({withdrawForm.walletCurrency})
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={withdrawForm.walletAddress}
+                      onChange={(e) =>
+                        setWithdrawForm({ ...withdrawForm, walletAddress: e.target.value })
+                      }
+                      className={inputClass}
+                      placeholder="bc1q..., 0x..., T..."
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="mb-6">
+                  <label className="block text-muted text-17 mb-2">Votre IBAN</label>
+                  <input
+                    type="text"
+                    required
+                    value={withdrawForm.iban}
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, iban: e.target.value })}
+                    className={inputClass}
+                    placeholder="FR76 3000 6000 0112 3456 7890 189"
+                  />
+                </div>
+              )}
               <button
                 type="submit"
                 disabled={submitting}
@@ -671,7 +778,12 @@ export default function ArtistDashboard() {
                         Frais : {formatChf(wd.fee)}
                       </p>
                     )}
-                    <p className="text-muted text-16">{wd.iban}</p>
+                    <p className="text-muted text-16">
+                      Vers :{" "}
+                      {wd.payout_method === "crypto"
+                        ? `${wd.wallet_currency ?? "Crypto"} · ${wd.wallet_address ?? "—"}`
+                        : wd.iban ?? "—"}
+                    </p>
                     <p className="text-muted text-16">{formatDate(wd.created_at)}</p>
 
                     {wd.status !== "rejected" && (
@@ -787,14 +899,23 @@ export default function ArtistDashboard() {
                 </span>
               </p>
               <p className="flex justify-between">
-                <span className="text-muted">Frais de service (20 % du montant)</span>
+                <span className="text-muted">
+                  Frais de service (20 % du montant)
+                  {isCryptoWithdraw ? `, en ${withdrawForm.walletCurrency}` : ""}
+                </span>
                 <span className="text-warning font-medium">
                   {formatChf(pendingAmount * FEE_RATE)}
                 </span>
               </p>
               <div className="border-t border-dark_border border-opacity-30 pt-3">
-                <p className="text-muted mb-1">Adresse de paiement à créditer</p>
-                <p className="text-primary font-medium break-all">{platformIban}</p>
+                <p className="text-muted mb-1">
+                  {isCryptoWithdraw
+                    ? `Adresse ${withdrawForm.walletCurrency} à créditer (frais)`
+                    : "Adresse de paiement à créditer"}
+                </p>
+                <p className="text-primary font-medium break-all">
+                  {isCryptoWithdraw ? platformWalletAddress : platformIban}
+                </p>
               </div>
             </div>
             <div className="flex flex-col gap-3">

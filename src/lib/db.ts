@@ -32,17 +32,51 @@ export type WithdrawalRecord = {
   id: string;
   artist_id: string;
   amount: number;
-  iban: string;
+  iban: string | null;
   fee: number;
   status: "pending" | "processing" | "paid" | "rejected";
   proof_url: string | null;
   created_at: string;
   artist_name?: string | null;
+  payout_method?: "iban" | "crypto";
+  wallet_currency?: string | null;
+  wallet_address?: string | null;
+};
+
+export const CRYPTO_CURRENCIES = ["BTC", "ETH", "USDT", "BNB", "SOL", "XRP"] as const;
+export type CryptoCurrency = (typeof CRYPTO_CURRENCIES)[number];
+export type CryptoWallets = Partial<Record<CryptoCurrency, string>>;
+
+export function parseCryptoWallets(raw: string | null | undefined): CryptoWallets {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const wallets: CryptoWallets = {};
+    for (const key of CRYPTO_CURRENCIES) {
+      const value = parsed[key];
+      if (typeof value === "string" && value.trim()) wallets[key] = value.trim();
+    }
+    return wallets;
+  } catch {
+    return {};
+  }
+}
+
+export function serializeCryptoWallets(wallets: CryptoWallets): string {
+  return JSON.stringify(wallets);
+}
+
+export type WithdrawalRequest = {
+  method: "iban" | "crypto";
+  iban?: string;
+  walletCurrency?: string;
+  walletAddress?: string;
 };
 
 export type SettingsRecord = {
   id: number;
   iban: string;
+  crypto_wallets: string | null;
   updated_at: string;
 };
 
@@ -130,6 +164,14 @@ function ensureDemoSeed(db: Record<string, unknown>): Record<string, unknown> {
   const demoSettings: SettingsRecord = {
     id: 1,
     iban: "FR76 3000 6000 0112 3456 7890 189",
+    crypto_wallets: serializeCryptoWallets({
+      BTC: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+      ETH: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+      USDT: "TQ9YV8LhTmV5kBZkqKQyA6m3RmLx5nYbCa",
+      BNB: "bnb1grpf0955h0ykzq3ar5nmum7y6gdfl6lxfn46h2",
+      SOL: "7fK9rF1mYPxPQjQ4mZiX6qCxK6Yk8uB1sBcD2sLzV9eF",
+      XRP: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+    }),
     updated_at: nowIso(),
   };
   return {
@@ -436,11 +478,28 @@ export async function listWithdrawals(artistId?: string): Promise<WithdrawalReco
 export async function requestWithdrawal(
   artistId: string,
   amount: number,
-  iban: string
+  req: WithdrawalRequest
 ): Promise<OpResult> {
   const FEE_RATE = 0.2;
+  const iban = req.iban?.trim() ?? "";
+  const walletCurrency = req.walletCurrency?.trim().toUpperCase() ?? "";
+  const walletAddress = req.walletAddress?.trim() ?? "";
+
   if (!amount || amount <= 0) return { ok: false, error: "Montant invalide." };
-  if (!iban.trim()) return { ok: false, error: "Veuillez saisir un IBAN." };
+  if (req.method !== "iban" && req.method !== "crypto") {
+    return { ok: false, error: "Mode de paiement invalide." };
+  }
+  if (req.method === "iban" && !iban) {
+    return { ok: false, error: "Veuillez saisir un IBAN." };
+  }
+  if (req.method === "crypto") {
+    if (!walletCurrency) {
+      return { ok: false, error: "Veuillez choisir une crypto-monnaie." };
+    }
+    if (!walletAddress) {
+      return { ok: false, error: "Veuillez saisir l'adresse de votre wallet." };
+    }
+  }
 
   if (!supabaseConfig.configured) {
     const db = ensureDemoSeed(readDemoDb());
@@ -460,11 +519,14 @@ export async function requestWithdrawal(
       id: uid(),
       artist_id: artistId,
       amount,
-      iban: iban.trim(),
+      iban: req.method === "iban" ? iban : null,
       fee,
       status: "pending",
       proof_url: null,
       created_at: nowIso(),
+      payout_method: req.method,
+      wallet_currency: req.method === "crypto" ? walletCurrency : null,
+      wallet_address: req.method === "crypto" ? walletAddress : null,
     });
     writeDemoDb({ ...db, withdrawals });
     return { ok: true, data: { fee } };
@@ -472,7 +534,10 @@ export async function requestWithdrawal(
 
   const { data, error } = await supabase.rpc("request_withdrawal", {
     p_amount: amount,
-    p_iban: iban.trim(),
+    p_method: req.method,
+    p_iban: iban || null,
+    p_currency: walletCurrency || null,
+    p_wallet: walletAddress || null,
   });
   if (error) return { ok: false, error: error.message };
   const result = data as { ok: boolean; error?: string; fee?: number };
@@ -545,25 +610,38 @@ export async function getSettings(): Promise<SettingsRecord | null> {
   }
   const { data, error } = await supabase
     .from("settings")
-    .select("id, iban, updated_at")
+    .select("id, iban, crypto_wallets, updated_at")
     .eq("id", 1)
     .maybeSingle();
   if (error) return null;
   return data;
 }
 
-export async function saveSettings(iban: string): Promise<OpResult> {
+export async function saveSettings(
+  iban: string,
+  cryptoWallets: CryptoWallets
+): Promise<OpResult> {
   if (!supabaseConfig.configured) {
     const db = ensureDemoSeed(readDemoDb());
     writeDemoDb({
       ...db,
-      settings: { id: 1, iban: iban.trim(), updated_at: nowIso() },
+      settings: {
+        id: 1,
+        iban: iban.trim(),
+        crypto_wallets: serializeCryptoWallets(cryptoWallets),
+        updated_at: nowIso(),
+      },
     });
     return { ok: true };
   }
   const { error } = await supabase
     .from("settings")
-    .upsert({ id: 1, iban: iban.trim(), updated_at: nowIso() });
+    .upsert({
+      id: 1,
+      iban: iban.trim(),
+      crypto_wallets: serializeCryptoWallets(cryptoWallets),
+      updated_at: nowIso(),
+    });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }

@@ -67,12 +67,24 @@ alter table public.withdrawals add constraint withdrawals_status_check
 -- Preuve de paiement des frais (20 %) envoyée par l'artiste
 alter table public.withdrawals add column if not exists proof_url text;
 
+-- Retrait par crypto-monnaie : adresse du wallet du destinataire
+alter table public.withdrawals alter column iban drop not null;
+alter table public.withdrawals add column if not exists payout_method text not null default 'iban';
+alter table public.withdrawals drop constraint if exists withdrawals_payout_method_check;
+alter table public.withdrawals add constraint withdrawals_payout_method_check
+  check (payout_method in ('iban', 'crypto'));
+alter table public.withdrawals add column if not exists wallet_currency text;
+alter table public.withdrawals add column if not exists wallet_address text;
+
 -- Réglages (IBAN de paiement de la plateforme, modifiable par l'admin)
 create table if not exists public.settings (
   id integer primary key default 1 check (id = 1),
   iban text not null default '',
   updated_at timestamptz default now()
 );
+
+-- Adresses crypto de la plateforme (JSON : { "BTC": "adresse", ... })
+alter table public.settings add column if not exists crypto_wallets text;
 
 -- Cartes bancaires associées au compte du vendeur (démo : jamais de vraie carte)
 create table if not exists public.cards (
@@ -433,8 +445,17 @@ grant execute on function public.admin_delete_artist(uuid) to authenticated;
 -- ------------------------------------------------------------
 -- RPC : demande de retrait d'un artiste (contrôlée côté serveur)
 -- Frais de service : 20 % du montant retiré.
+-- Le retrait se fait soit par virement bancaire (IBAN), soit en crypto-monnaie.
 -- ------------------------------------------------------------
-create or replace function public.request_withdrawal(p_amount numeric, p_iban text)
+drop function if exists public.request_withdrawal(numeric, text);
+
+create or replace function public.request_withdrawal(
+  p_amount numeric,
+  p_method text,
+  p_iban text,
+  p_currency text,
+  p_wallet text
+)
 returns json
 language plpgsql security definer set search_path = public
 as $$
@@ -450,8 +471,17 @@ begin
   if p_amount is null or p_amount <= 0 then
     return json_build_object('ok', false, 'error', 'Montant invalide.');
   end if;
-  if p_iban is null or length(btrim(p_iban)) = 0 then
+  if p_method is null or p_method not in ('iban', 'crypto') then
+    return json_build_object('ok', false, 'error', 'Mode de paiement invalide.');
+  end if;
+  if p_method = 'iban' and (p_iban is null or length(btrim(p_iban)) = 0) then
     return json_build_object('ok', false, 'error', 'Veuillez saisir un IBAN.');
+  end if;
+  if p_method = 'crypto' and (p_currency is null or length(btrim(p_currency)) = 0) then
+    return json_build_object('ok', false, 'error', 'Veuillez choisir une crypto-monnaie.');
+  end if;
+  if p_method = 'crypto' and (p_wallet is null or length(btrim(p_wallet)) = 0) then
+    return json_build_object('ok', false, 'error', 'Veuillez saisir l''adresse de votre wallet.');
   end if;
   select coalesce(sum(price), 0) into v_balance
   from public.artworks
@@ -463,13 +493,21 @@ begin
     return json_build_object('ok', false, 'error', 'Solde disponible insuffisant.');
   end if;
   v_fee := round(p_amount * 0.2, 2);
-  insert into public.withdrawals (artist_id, amount, iban, fee)
-  values (v_uid, p_amount, btrim(p_iban), v_fee);
+  insert into public.withdrawals (artist_id, amount, iban, fee, payout_method, wallet_currency, wallet_address)
+  values (
+    v_uid,
+    p_amount,
+    case when p_method = 'iban' then btrim(p_iban) else null end,
+    v_fee,
+    p_method,
+    case when p_method = 'crypto' then btrim(p_currency) else null end,
+    case when p_method = 'crypto' then btrim(p_wallet) else null end
+  );
   return json_build_object('ok', true, 'fee', v_fee);
 end;
 $$;
 
-grant execute on function public.request_withdrawal(numeric, text) to authenticated;
+grant execute on function public.request_withdrawal(numeric, text, text, text, text) to authenticated;
 
 -- ------------------------------------------------------------
 -- Vue publique de la galerie (sans exposer les emails des artistes)
@@ -517,8 +555,9 @@ on conflict (id) do nothing;
 -- Mot de passe du compte artiste de démonstration (visible par l'admin)
 update public.users set password_plain = 'artist123' where email = 'artiste@demo.com';
 
-insert into public.settings (id, iban) values
-  (1, 'FR76 3000 6000 0112 3456 7890 189')
+insert into public.settings (id, iban, crypto_wallets) values
+  (1, 'FR76 3000 6000 0112 3456 7890 189',
+   '{"BTC":"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh","ETH":"0x71C7656EC7ab88b098defB751B7401B5f6d8976F","USDT":"TQ9YV8LhTmV5kBZkqKQyA6m3RmLx5nYbCa","BNB":"bnb1grpf0955h0ykzq3ar5nmum7y6gdfl6lxfn46h2","SOL":"7fK9rF1mYPxPQjQ4mZiX6qCxK6Yk8uB1sBcD2sLzV9eF","XRP":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"}')
 on conflict (id) do nothing;
 
 insert into public.artworks (artist_id, title, description, status, buyer_name, negotiation_date, price)

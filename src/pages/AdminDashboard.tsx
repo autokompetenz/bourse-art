@@ -6,8 +6,10 @@ import {
   ArtistRecord,
   ArtworkRecord,
   CardWithArtist,
+  CryptoWallets,
   OrderRecord,
   WithdrawalRecord,
+  CRYPTO_CURRENCIES,
   createArtistAccount,
   createArtwork,
   deleteArtwork,
@@ -19,6 +21,7 @@ import {
   listOrders,
   listWithdrawals,
   markArtworkSold,
+  parseCryptoWallets,
   updateWithdrawalStatus,
   revertArtwork,
   saveSettings,
@@ -92,6 +95,7 @@ export default function AdminDashboard() {
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
   const [cards, setCards] = useState<CardWithArtist[]>([]);
   const [iban, setIban] = useState("");
+  const [cryptoWallets, setCryptoWallets] = useState<CryptoWallets>({});
   const [loading, setLoading] = useState(true);
 
   const [newUser, setNewUser] = useState({ name: "", email: "" });
@@ -150,6 +154,7 @@ export default function AdminDashboard() {
       setOrders(ordRes);
       setWithdrawals(wdRes);
       setIban(setRes?.iban ?? "");
+      setCryptoWallets(parseCryptoWallets(setRes?.crypto_wallets ?? null));
       setCards(cardRes);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Impossible de charger les données.");
@@ -179,7 +184,10 @@ export default function AdminDashboard() {
   );
 
   const filteredWithdrawals = useMemo(
-    () => withdrawals.filter((w) => matchAny(wdSearch, w.artist_name, w.iban)),
+    () =>
+      withdrawals.filter((w) =>
+        matchAny(wdSearch, w.artist_name, w.iban, w.wallet_address, w.wallet_currency)
+      ),
     [withdrawals, wdSearch]
   );
   const wdPages = Math.max(1, Math.ceil(filteredWithdrawals.length / PAGE_SIZE));
@@ -353,12 +361,21 @@ export default function AdminDashboard() {
   };
 
   const handleSaveIban = async () => {
-    const result = await saveSettings(iban);
+    const result = await saveSettings(iban, cryptoWallets);
     if (!result.ok) {
       toast.error(result.error);
       return;
     }
     toast.success("IBAN mis à jour.");
+  };
+
+  const handleSaveCryptoWallets = async () => {
+    const result = await saveSettings(iban, cryptoWallets);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Adresses crypto mises à jour.");
   };
 
   const handleChangeWithdrawalStatus = async (id: string, status: string) => {
@@ -437,6 +454,36 @@ export default function AdminDashboard() {
               Enregistrer
             </button>
           </div>
+        </div>
+
+        <div className="border border-dark_border/25 rounded-xl p-5 sm:p-8 bg-white shadow-sm mb-10">
+          <h2 className="text-ink text-24 font-medium mb-2">
+            Adresses crypto de la plateforme
+          </h2>
+          <p className="text-muted text-17 mb-6">
+            Adresses à créditer pour les frais de service (20 %) lors d'un
+            retrait en crypto-monnaie.
+          </p>
+          <div className="grid md:grid-cols-2 gap-6">
+            {CRYPTO_CURRENCIES.map((c) => (
+              <div key={c}>
+                <label className="block text-muted text-17 mb-2">Adresse {c}</label>
+                <input
+                  type="text"
+                  value={cryptoWallets[c] ?? ""}
+                  onChange={(e) => setCryptoWallets({ ...cryptoWallets, [c]: e.target.value })}
+                  className={inputClass}
+                  placeholder={`Adresse ${c}...`}
+                />
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={handleSaveCryptoWallets}
+            className="btn-grad !px-6 !py-3 !text-17 mt-6"
+          >
+            Enregistrer les adresses
+          </button>
         </div>
 
         {tab === "ventes" && (
@@ -917,7 +964,13 @@ export default function AdminDashboard() {
                         <p className="text-muted text-16">
                           Frais de service (20 %) : {formatChf(wd.fee)}
                         </p>
-                        <p className="text-muted text-16">IBAN : {wd.iban}</p>
+                        {wd.payout_method === "crypto" ? (
+                          <p className="text-muted text-16 break-all">
+                            Wallet : {wd.wallet_currency ?? "—"} · {wd.wallet_address ?? "—"}
+                          </p>
+                        ) : (
+                          <p className="text-muted text-16 break-all">IBAN : {wd.iban ?? "—"}</p>
+                        )}
                         <p className="text-muted text-16">{formatDate(wd.created_at)}</p>
                         {wd.proof_url ? (
                           <div className="flex items-center gap-3 mt-3">

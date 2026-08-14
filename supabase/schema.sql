@@ -513,6 +513,38 @@ $$;
 grant execute on function public.request_withdrawal(numeric, text, text, text, text) to authenticated;
 
 -- ------------------------------------------------------------
+-- RPC : l'artiste annule sa propre demande de retrait tant qu'elle
+-- est en attente (status 'pending' -> 'rejected'). La vérification de
+-- propriété et de statut est faite ici, pas dans la RLS.
+-- ------------------------------------------------------------
+create or replace function public.cancel_withdrawal(p_id uuid)
+returns json
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_status text;
+begin
+  if v_uid is null then
+    return json_build_object('ok', false, 'error', 'Accès refusé.');
+  end if;
+  select status into v_status
+  from public.withdrawals
+  where id = p_id and artist_id = v_uid;
+  if v_status is null then
+    return json_build_object('ok', false, 'error', 'Retrait introuvable.');
+  end if;
+  if v_status <> 'pending' then
+    return json_build_object('ok', false, 'error', 'Seule une demande en attente peut être annulée.');
+  end if;
+  update public.withdrawals set status = 'rejected' where id = p_id;
+  return json_build_object('ok', true);
+end;
+$$;
+
+grant execute on function public.cancel_withdrawal(uuid) to authenticated;
+
+-- ------------------------------------------------------------
 -- Vue publique de la galerie (sans exposer les emails des artistes)
 -- Sécurité invoker désactivée : exécutée avec les droits du propriétaire,
 -- mais elle ne renvoie que les champs destinés à l'affichage public.

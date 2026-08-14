@@ -9,6 +9,7 @@ import {
   CryptoWallets,
   WithdrawalRecord,
   CRYPTO_CURRENCIES,
+  cancelWithdrawal,
   createArtwork,
   deleteArtwork,
   getCard,
@@ -285,6 +286,17 @@ export default function ArtistDashboard() {
 
   const handleProofSelect = (e: ChangeEvent<HTMLInputElement>) => {
     setProofFile(e.target.files?.[0] ?? null);
+  };
+
+  const handleCancelWithdrawal = async (id: string) => {
+    if (!window.confirm("Annuler cette demande de retrait ?")) return;
+    const result = await cancelWithdrawal(id);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Demande de retrait annulée.");
+    loadData();
   };
 
   const handleProofSubmit = async (e: FormEvent) => {
@@ -822,6 +834,13 @@ export default function ArtistDashboard() {
                         <p className="text-ink font-medium break-all">
                           {receivingAddressFor(wd)}
                         </p>
+                        <button
+                          type="button"
+                          onClick={() => handleCancelWithdrawal(wd.id)}
+                          className="mt-1 text-error text-15 hover:underline"
+                        >
+                          Annuler cette demande
+                        </button>
                       </div>
                     )}
 

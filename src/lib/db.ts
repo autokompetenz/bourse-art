@@ -566,6 +566,30 @@ export async function updateWithdrawalStatus(
   return { ok: true };
 }
 
+export async function cancelWithdrawal(id: string): Promise<OpResult> {
+  if (!supabaseConfig.configured) {
+    const db = ensureDemoSeed(readDemoDb());
+    const rows = normalize<WithdrawalRecord>(db.withdrawals as WithdrawalRecord[]);
+    const target = rows.find((w) => w.id === id);
+    if (!target) return { ok: false, error: "Retrait introuvable." };
+    if (target.status !== "pending") {
+      return { ok: false, error: "Seule une demande en attente peut être annulée." };
+    }
+    writeDemoDb({
+      ...db,
+      withdrawals: rows.map((w) => (w.id === id ? { ...w, status: "rejected" } : w)),
+    });
+    return { ok: true };
+  }
+  const { data, error } = await supabase.rpc("cancel_withdrawal", { p_id: id });
+  if (error) return { ok: false, error: error.message };
+  const result = data as { ok: boolean; error?: string };
+  if (!result.ok) {
+    return { ok: false, error: result.error ?? "Impossible d'annuler le retrait." };
+  }
+  return { ok: true };
+}
+
 const WITHDRAWAL_PROOFS_BUCKET = "withdrawal-proofs";
 
 export async function uploadWithdrawalProof(

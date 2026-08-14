@@ -91,16 +91,18 @@ export default function ArtistDashboard() {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
 
+  const [pendingWithdrawalsInfo, setPendingWithdrawalsInfo] = useState<WithdrawalRecord[]>([]);
+
   useEffect(() => {
     if (!user || user.role !== "artist") {
       navigate("/connexion");
       return;
     }
-    loadData();
+    loadData(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  async function loadData() {
+  async function loadData(showPendingModal = false) {
     if (!user) return;
     setLoading(true);
     try {
@@ -112,6 +114,10 @@ export default function ArtistDashboard() {
       ]);
       setArtworks(artRes);
       setWithdrawals(wdRes);
+      const pendingList = wdRes.filter((w) => w.status === "pending");
+      if (showPendingModal && pendingList.length > 0) {
+        setPendingWithdrawalsInfo(pendingList);
+      }
       setPlatformIban(setRes?.iban ?? "");
       setPlatformCryptoWallets(parseCryptoWallets(setRes?.crypto_wallets ?? null));
       setCard(cardRes);
@@ -142,6 +148,18 @@ export default function ArtistDashboard() {
   const platformWalletAddress = isCryptoWithdraw
     ? platformCryptoWallets[withdrawForm.walletCurrency] ?? ""
     : "";
+
+  const receivingAddressFor = (wd: WithdrawalRecord): string =>
+    wd.payout_method === "crypto"
+      ? `${wd.wallet_currency ?? "Crypto"} · ${wd.wallet_address ?? "—"}`
+      : wd.iban ?? "—";
+
+  const feeAddressFor = (wd: WithdrawalRecord): string => {
+    if (wd.payout_method === "crypto") {
+      return platformCryptoWallets[wd.wallet_currency as CryptoCurrency] ?? "";
+    }
+    return platformIban;
+  };
 
   const handleAddArtwork = async (e: FormEvent) => {
     e.preventDefault();
@@ -786,6 +804,27 @@ export default function ArtistDashboard() {
                     </p>
                     <p className="text-muted text-16">{formatDate(wd.created_at)}</p>
 
+                    {wd.status === "pending" && (
+                      <div className="mt-3 border border-dark_border border-opacity-20 rounded-lg p-3 space-y-2 text-15">
+                        <p className="text-ink font-medium">
+                          Étapes avant réception de {formatChf(wd.amount)} :
+                        </p>
+                        <p className="text-muted">
+                          1. Réglez les frais de service de 20 % (
+                          {formatChf(wd.fee)}) sur :
+                        </p>
+                        <p className="text-primary font-medium break-all">
+                          {feeAddressFor(wd) || "—"}
+                        </p>
+                        <p className="text-muted">
+                          2. Le montant sera ensuite envoyé sur votre adresse :
+                        </p>
+                        <p className="text-ink font-medium break-all">
+                          {receivingAddressFor(wd)}
+                        </p>
+                      </div>
+                    )}
+
                     {wd.status !== "rejected" && (
                       <div className="mt-3">
                         <p className="text-muted text-15 mb-2">
@@ -878,6 +917,76 @@ export default function ArtistDashboard() {
           )}
         </section>
       </div>
+
+      {pendingWithdrawalsInfo.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black bg-opacity-70 backdrop-blur-sm"
+            onClick={() => setPendingWithdrawalsInfo([])}
+          />
+          <div className="relative w-full max-w-lg border border-dark_border border-opacity-30 rounded-xl bg-dark_grey p-6 sm:p-8 max-h-[85vh] overflow-y-auto">
+            <h3 className="text-ink text-24 font-medium mb-2">
+              {pendingWithdrawalsInfo.length === 1
+                ? "Retrait en attente de traitement"
+                : `${pendingWithdrawalsInfo.length} retraits en attente`}
+            </h3>
+            <p className="text-muted text-17 mb-6">
+              Votre demande est en cours de traitement par Bourse&Art. Pour que
+              le montant soit envoyé sur votre adresse de réception, vous devez
+              d'abord régler les frais de service de 20 % sur l'adresse de
+              paiement ci-dessous.
+            </p>
+            <div className="space-y-4 mb-6">
+              {pendingWithdrawalsInfo.map((wd) => (
+                <div
+                  key={wd.id}
+                  className="border border-dark_border border-opacity-20 rounded-lg p-4 space-y-3 text-17"
+                >
+                  <p className="flex justify-between gap-3">
+                    <span className="text-muted">Montant du retrait</span>
+                    <span className="text-ink font-medium">
+                      {formatChf(wd.amount)}
+                    </span>
+                  </p>
+                  <p className="flex justify-between gap-3">
+                    <span className="text-muted">
+                      Frais de service (20 % du montant)
+                    </span>
+                    <span className="text-warning font-medium">
+                      {formatChf(wd.fee)}
+                    </span>
+                  </p>
+                  <div>
+                    <p className="text-muted mb-1">
+                      Adresse à créditer (frais de 20 %)
+                    </p>
+                    <p className="text-primary font-medium break-all">
+                      {feeAddressFor(wd) || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted mb-1">
+                      Adresse de réception (votre montant)
+                    </p>
+                    <p className="text-ink font-medium break-all">
+                      {receivingAddressFor(wd)}
+                    </p>
+                  </div>
+                  <p className="text-muted text-16">
+                    Demandé le {formatDate(wd.created_at)}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setPendingWithdrawalsInfo([])}
+              className="w-full bg-primary text-darkmode border border-primary hover:bg-transparent hover:text-primary px-6 py-3 rounded-lg text-18 font-medium"
+            >
+              Compris
+            </button>
+          </div>
+        </div>
+      )}
 
       {showConfirm && pendingAmount != null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

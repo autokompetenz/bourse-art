@@ -765,9 +765,17 @@ export default function AdminDashboard() {
             </form>
 
             <div className="mt-10">
-              <h3 className="text-ink text-22 font-medium mb-4">
-                Artistes ({artists.length})
-              </h3>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h3 className="text-ink text-22 font-medium">
+                  Artistes ({artists.length})
+                </h3>
+                <p className="text-16">
+                  <span className="text-muted">Solde total : </span>
+                  <span className="text-ink font-semibold">
+                    {formatChf(artists.reduce((sum, a) => sum + (a.balance ?? 0), 0))}
+                  </span>
+                </p>
+              </div>
               {artists.length === 0 ? (
                 <p className="text-muted text-17">Aucun artiste pour le moment.</p>
               ) : (
@@ -783,6 +791,14 @@ export default function AdminDashboard() {
                           {a.email} · {a.artworks_count} tableau{a.artworks_count > 1 ? "x" : ""}
                           {a.created_at ? ` · inscrit le ${formatDate(a.created_at)}` : ""}
                         </p>
+                        {!a.pending && (
+                          <p className="text-16 mt-1">
+                            <span className="text-muted">Solde : </span>
+                            <span className="text-ink font-semibold">
+                              {formatChf(a.balance ?? 0)}
+                            </span>
+                          </p>
+                        )}
                         {!a.pending && (
                           <p className="text-16 mt-1">
                             <span className="text-muted">Mot de passe : </span>

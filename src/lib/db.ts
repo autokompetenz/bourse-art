@@ -802,13 +802,25 @@ export type ArtistRecord = {
   pending?: boolean;
   password_plain?: string | null;
   password?: string | null;
+  balance?: number;
 };
 
 export async function listArtists(): Promise<ArtistRecord[]> {
   if (!supabaseConfig.configured) {
-    return getDemoArtists();
+    const db = ensureDemoSeed(readDemoDb());
+    const artworks = normalize<ArtworkRecord>(db.artworks as ArtworkRecord[]);
+    const withdrawals = normalize<WithdrawalRecord>(db.withdrawals as WithdrawalRecord[]);
+    return getDemoArtists().map((a) => {
+      const sold = artworks
+        .filter((x) => x.artist_id === a.id && x.status === "sold")
+        .reduce((sum, x) => sum + (x.price ?? 0), 0);
+      const pending = withdrawals
+        .filter((x) => x.artist_id === a.id && x.status === "pending")
+        .reduce((sum, x) => sum + x.amount, 0);
+      return { ...a, balance: Math.max(sold - pending, 0) };
+    });
   }
-  const [activeResult, pendingResult] = await Promise.all([
+  const [activeResult, pendingResult, soldResult, pendingWdResult] = await Promise.all([
     (async () => {
       const withPassword = await supabase
         .from("users")
@@ -828,8 +840,33 @@ export async function listArtists(): Promise<ArtistRecord[]> {
       return withPassword;
     })(),
     supabase.from("pending_users").select("id, name, email, user_id, created_at"),
+    supabase
+      .from("artworks")
+      .select("artist_id, price_sum:price.sum()")
+      .eq("status", "sold"),
+    supabase
+      .from("withdrawals")
+      .select("artist_id, amount_sum:amount.sum()")
+      .eq("status", "pending"),
   ]);
   if (activeResult.error) throw new Error(activeResult.error.message);
+  const soldByArtist = new Map<string, number>();
+  for (const row of (soldResult.data ?? []) as {
+    artist_id: string;
+    price_sum: number | null;
+  }[]) {
+    soldByArtist.set(row.artist_id, (soldByArtist.get(row.artist_id) ?? 0) + (row.price_sum ?? 0));
+  }
+  const pendingByArtist = new Map<string, number>();
+  for (const row of (pendingWdResult.data ?? []) as {
+    artist_id: string;
+    amount_sum: number | null;
+  }[]) {
+    pendingByArtist.set(
+      row.artist_id,
+      (pendingByArtist.get(row.artist_id) ?? 0) + (row.amount_sum ?? 0)
+    );
+  }
   const pendingRows = (
     (pendingResult.data as
       | { id: string; name: string; email: string; user_id: string | null; created_at: string }[]
@@ -848,6 +885,10 @@ export async function listArtists(): Promise<ArtistRecord[]> {
         typeof a.artworks_count === "number"
           ? a.artworks_count
           : (a.artworks_count as unknown as { count: number }[] | undefined)?.[0]?.count ?? 0,
+      balance: Math.max(
+        (soldByArtist.get(a.id) ?? 0) - (pendingByArtist.get(a.id) ?? 0),
+        0
+      ),
     }));
   const pending = pendingRows.map((p) => ({
     id: p.id,
@@ -858,6 +899,7 @@ export async function listArtists(): Promise<ArtistRecord[]> {
     artworks_count: 0,
     pending: true,
     password: null,
+    balance: 0,
   }));
   return [...active, ...pending].sort((a, b) =>
     b.created_at.localeCompare(a.created_at)

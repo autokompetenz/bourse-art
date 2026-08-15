@@ -214,6 +214,26 @@ export default function AdminDashboard() {
 
   const selectableArtists = artists.filter((a) => !a.pending);
 
+  const balanceByArtist = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const art of artworks) {
+      if (art.status === "sold" && art.price != null && art.artist_id) {
+        map.set(art.artist_id, (map.get(art.artist_id) ?? 0) + art.price);
+      }
+    }
+    for (const w of withdrawals) {
+      if (w.status === "pending" && w.artist_id) {
+        map.set(w.artist_id, (map.get(w.artist_id) ?? 0) - w.amount);
+      }
+    }
+    return map;
+  }, [artworks, withdrawals]);
+
+  const totalBalance = useMemo(
+    () => artists.reduce((sum, a) => sum + Math.max(balanceByArtist.get(a.id) ?? 0, 0), 0),
+    [artists, balanceByArtist]
+  );
+
   const handleCreateUser = async (e: FormEvent) => {
     e.preventDefault();
     if (!newUser.name.trim() || !newUser.email.trim()) {
@@ -772,7 +792,7 @@ export default function AdminDashboard() {
                 <p className="text-16">
                   <span className="text-muted">Solde total : </span>
                   <span className="text-ink font-semibold">
-                    {formatChf(artists.reduce((sum, a) => sum + (a.balance ?? 0), 0))}
+                    {formatChf(totalBalance)}
                   </span>
                 </p>
               </div>
@@ -795,7 +815,7 @@ export default function AdminDashboard() {
                           <p className="text-16 mt-1">
                             <span className="text-muted">Solde : </span>
                             <span className="text-ink font-semibold">
-                              {formatChf(a.balance ?? 0)}
+                              {formatChf(Math.max(balanceByArtist.get(a.id) ?? 0, 0))}
                             </span>
                           </p>
                         )}

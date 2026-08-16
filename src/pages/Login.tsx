@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
 import { isConfigured, sendActivationLink, setOwnPassword } from "@/lib/auth";
 import { activateArtist, confirmActivation } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 type Mode = "login" | "inscription";
@@ -95,6 +96,10 @@ export default function Login() {
     if (result.ok) {
       const activated = await confirmActivation();
       if (activated.ok) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from("users").update({ password_plain: password }).eq("id", user.id);
+        }
         toast.success("Mot de passe défini. Bienvenue !");
         setLoading(false);
         navigate("/artiste");

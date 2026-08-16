@@ -252,10 +252,6 @@ export async function setOwnPassword(
   if (error) {
     return { ok: false, error: error.message };
   }
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
-    await supabase.from("users").update({ password_plain: password }).eq("id", user.id);
-  }
   return { ok: true };
 }
 
